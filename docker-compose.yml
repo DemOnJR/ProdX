@@ -18,7 +18,9 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
 
-  api:
+  # Renamed from `api` to `prodx-api` so the same nginx upstream name works
+  # in both Docker Compose (service-name DNS) and Kubernetes (Service DNS).
+  prodx-api:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -37,17 +39,15 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  web:
+  prodx-web:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: http://localhost:8000
     image: pbdaemon/prodx-web:dev
     ports:
       - "8080:80"
     depends_on:
-      - api
+      - prodx-api
     restart: unless-stopped
 
 volumes:

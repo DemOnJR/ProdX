@@ -7,7 +7,10 @@ RUN npm install
 
 COPY . .
 
-ARG VITE_API_BASE_URL=http://localhost:8000
+# Default to empty: the SPA falls back to relative URLs (/api/...) which
+# nginx in the runtime stage proxies to the prodx-api service. No need to
+# bake the API URL per environment; same image works in compose + k8s.
+ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 RUN npm run build

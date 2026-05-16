@@ -76,8 +76,9 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          build-args: |
-            VITE_API_BASE_URL=http://localhost:8000
+          # No VITE_API_BASE_URL: the SPA uses relative /api URLs and the
+          # built-in nginx proxies them to the prodx-api service. Same image
+          # works in compose, k8s, and behind a Cloudflare Tunnel.
           tags: ${{ steps.web-meta.outputs.tags }}
           labels: ${{ steps.web-meta.outputs.labels }}
           cache-from: type=gha
