@@ -582,6 +582,50 @@ gcloud config set project &lt;your-project-id&gt;</code></pre>
     <li><code>gcloud auth application-default login</code> — credentials Terraform's google provider picks up automatically.</li>
   </ul>
 
+  <h3>Common warnings after <code>gcloud config set project</code></h3>
+  <p>On your first project switch, gcloud usually prints one or two advisory warnings. Neither blocks <code>terraform apply</code>, but both have clean fixes:</p>
+
+  <h4>1. "Your active project does not match the quota project in your local Application Default Credentials file"</h4>
+  <p>The ADC file was created when you ran <code>gcloud auth application-default login</code> and pinned itself to whatever project was active at that moment. After you switch projects with <code>gcloud config set project</code>, the two get out of sync — and Terraform's google provider would bill its API quota to the wrong project. One-line fix:</p>
+<pre><code>gcloud auth application-default set-quota-project &lt;your-project-id&gt;</code></pre>
+
+  <h4>2. "Project '...' lacks an 'environment' tag"</h4>
+  <p>GCP recommends labeling every project with an <code>environment</code> tag (<code>Production</code>, <code>Development</code>, <code>Test</code>, <code>Staging</code>) so you can write IAM / billing policies that target classes of projects. This warning only fires when your account is in a GCP <strong>Organization</strong> (Google Workspace, Cloud Identity, or a company tenant).</p>
+
+  <div class="callout note">
+    <p>If you're on a personal Gmail account with no organization, this warning doesn't apply to you — ignore it. Skip to the next step.</p>
+  </div>
+
+  <p>If you <em>are</em> in an org, bind a value to the project once:</p>
+<pre><code># Find your org ID
+gcloud organizations list
+
+# Check if an 'environment' tag key already exists
+gcloud resource-manager tags keys list --parent=organizations/&lt;ORG_ID&gt;
+
+# List the available values for the key (Production, Development, ...)
+gcloud resource-manager tags values list --parent=tagKeys/&lt;KEY_ID&gt;
+
+# Get the project number (bindings use the number, not the ID)
+gcloud projects describe &lt;your-project-id&gt; --format="value(projectNumber)"
+
+# Bind a value to your project
+gcloud resource-manager tags bindings create `
+  --tag-value=tagValues/&lt;VALUE_ID&gt; `
+  --parent=//cloudresourcemanager.googleapis.com/projects/&lt;PROJECT_NUMBER&gt;</code></pre>
+
+  <p>If the <code>environment</code> tag key doesn't exist yet in your org (and you have org-level permissions), create it once:</p>
+<pre><code>gcloud resource-manager tags keys create environment `
+  --parent=organizations/&lt;ORG_ID&gt; `
+  --description="Project environment"
+
+gcloud resource-manager tags values create Development --parent=tagKeys/&lt;KEY_ID&gt;
+gcloud resource-manager tags values create Production  --parent=tagKeys/&lt;KEY_ID&gt;</code></pre>
+
+  <div class="callout note">
+    <p>The warning only re-checks when you change the active project, so you only have to do this once per project.</p>
+  </div>
+
   <h3>Enable the APIs Terraform will call</h3>
 <pre><code>gcloud services enable `
   compute.googleapis.com `
