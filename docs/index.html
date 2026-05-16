@@ -579,12 +579,7 @@ git push</code></pre>
   </table>
 
   <h3>7.1 — Claim the free trial credit</h3>
-  <p>If you don't already have a billing account: sign up at <a href="https://cloud.google.com/free">cloud.google.com/free</a> and claim the $300 / 90-day trial. The trial creates a billing account; we'll create the project itself with Terraform.</p>
-
-  <div class="callout note">
-    <p>If you already created a project manually (e.g. <code>prodx-496517</code> from earlier in the tutorial), <strong>delete it</strong> before continuing. Terraform will create a fresh one called <code>prodx-dev</code> under the new org. Console → IAM &amp; Admin → Settings → <strong>Shut down</strong>, or:</p>
-<pre><code>gcloud projects delete prodx-496517</code></pre>
-  </div>
+  <p>If you don't already have a billing account: sign up at <a href="https://cloud.google.com/free">cloud.google.com/free</a> and claim the $300 / 90-day trial. The trial creates a billing account; we'll create the project itself with Terraform in step 10.</p>
 
   <h3>7.2 — Set up Cloud Identity Free (gives you the GCP Organization)</h3>
   <p>Cloud Identity Free is HashiCorp-style: free forever, identity-only (no email), up to 50 users. It's the standard way to provision a GCP Org for personal projects.</p>
