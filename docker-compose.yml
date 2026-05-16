@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-prodx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prodx}
+      POSTGRES_DB: ${POSTGRES_DB:-prodx}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-prodx} -d ${POSTGRES_DB:-prodx}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: pbdaemon/prodx-api:dev
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-prodx}:${POSTGRES_PASSWORD:-prodx}@postgres:5432/${POSTGRES_DB:-prodx}
+      REDIS_URL: redis://redis:6379/0
+      CACHE_TTL_SECONDS: "60"
+      CORS_ORIGINS: "http://localhost:8080,http://localhost:5173,http://127.0.0.1:8080,http://127.0.0.1:5173"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    image: pbdaemon/prodx-web:dev
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pg_data:
