@@ -666,34 +666,37 @@ cloud {
 <section id="cloudflare">
   <h2><span class="step">09</span>Cloudflare setup</h2>
 
-  <h3>Add the zone</h3>
+  <p>The dev env runs <code>cloudflared</code> in the cluster but the tunnel, DNS records, and ingress rules are configured in the Cloudflare Zero Trust dashboard. Less IaC than calling the CF API from Terraform — but no CF API token to manage and no chicken-and-egg between tunnel creation and DNS.</p>
+
+  <h3>9.1 — Add the zone</h3>
   <p>Your domain (<code>pbcv.dev</code> in this tutorial) must be a zone in your Cloudflare account. If it isn't yet: dashboard → <strong>Add a site</strong> → pick the Free plan → change nameservers at your registrar to the two CF nameservers shown. Wait until CF reports the zone as <em>Active</em> (usually under an hour).</p>
 
-  <h3>Get your Account ID</h3>
-  <p>Open any zone in the dashboard. The right sidebar shows <strong>Account ID</strong> (a 32-character hex string). Copy it.</p>
-
-  <h3>Create an API token</h3>
+  <h3>9.2 — Create a tunnel</h3>
   <ol>
-    <li>Go to <a href="https://dash.cloudflare.com/profile/api-tokens">dash.cloudflare.com/profile/api-tokens</a>.</li>
-    <li><strong>Create Token</strong> → <strong>Custom token</strong>.</li>
-    <li>Name: <code>prodx-terraform</code>.</li>
-    <li>Permissions:
-      <table>
-        <thead><tr><th>Scope</th><th>Resource</th><th>Access</th></tr></thead>
-        <tbody>
-          <tr><td>Account</td><td>Cloudflare Tunnel</td><td>Edit</td></tr>
-          <tr><td>Account</td><td>Account Settings</td><td>Read</td></tr>
-          <tr><td>Zone</td><td>DNS</td><td>Edit</td></tr>
-          <tr><td>Zone</td><td>Zone</td><td>Read</td></tr>
-        </tbody>
-      </table>
-    </li>
-    <li>Zone Resources: <strong>Include → Specific zone → <code>pbcv.dev</code></strong>.</li>
-    <li>Continue → Create. <strong>Copy the token immediately</strong> — Cloudflare only shows it once.</li>
+    <li>Open <a href="https://one.dash.cloudflare.com">one.dash.cloudflare.com</a> (Zero Trust dashboard).</li>
+    <li>Left sidebar → <strong>Networks → Tunnels</strong>.</li>
+    <li><strong>Create a tunnel</strong> → <strong>Cloudflared</strong> → name it <code>prodx-dev</code> → Save tunnel.</li>
+    <li>The next page ("Install and run a connector") shows a <code>docker run</code> command. <strong>Copy the long string that comes after <code>--token</code></strong> — that's your tunnel run token. Save it somewhere; we'll paste it into <code>envs/dev/terraform.tfvars</code> in step 11.</li>
+    <li>You can ignore the rest of that page — Cloudflare expects you to run their docker command manually, but Terraform will deploy a Kubernetes Deployment with the same image and token instead. Click <strong>Next</strong> at the bottom of the page.</li>
   </ol>
 
+  <h3>9.3 — Add Public Hostnames</h3>
+  <p>Still inside the tunnel's setup wizard (or later via the tunnel's <strong>Public Hostnames</strong> tab), add three entries. CF auto-creates the DNS CNAME records for each.</p>
+  <table>
+    <thead><tr><th>Subdomain</th><th>Domain</th><th>Service type</th><th>URL</th></tr></thead>
+    <tbody>
+      <tr><td><code>argocd</code></td><td><code>pbcv.dev</code></td><td>HTTP</td><td><code>argocd-server.argocd.svc.cluster.local:80</code></td></tr>
+      <tr><td><code>prodx</code></td><td><code>pbcv.dev</code></td><td>HTTP</td><td><code>prodx-web.prodx.svc.cluster.local:80</code></td></tr>
+      <tr><td><code>prodxapi</code></td><td><code>pbcv.dev</code></td><td>HTTP</td><td><code>prodx-api.prodx.svc.cluster.local:8000</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout note">
+    <p>The argocd hostname will work right after the dev apply finishes. <code>prodx</code> and <code>prodxapi</code> will return 502 (correctly — the services don't exist yet) until ProdXCD deploys those workloads. No DNS changes needed when the services come up; cloudflared retries on every request.</p>
+  </div>
+
   <div class="callout danger">
-    <p><strong>This token is a secret.</strong> Don't paste it into Git, screenshots, or chat. It goes into <code>terraform.tfvars</code>, which is gitignored.</p>
+    <p><strong>Tunnel token is a secret.</strong> Don't paste it into Git, screenshots, or public chat. It goes into <code>terraform.tfvars</code>, which is gitignored. If a token ends up somewhere it shouldn't, delete the tunnel in CF (the token dies with it) and create a new one.</p>
   </div>
 </section>
 
@@ -760,20 +763,19 @@ gcloud auth application-default set-quota-project (terraform output -raw project
   <h2><span class="step">11</span>terraform apply: dev</h2>
 
   <h3>Create your local tfvars file</h3>
-<pre><code>cd ..\dev
-copy terraform.tfvars.example terraform.tfvars
-notepad terraform.tfvars</code></pre>
+<pre><code>cd ../dev
+cp terraform.tfvars.example terraform.tfvars
+$EDITOR terraform.tfvars</code></pre>
 
-  <p>Fill in the three required values — <code>project_id</code> comes from the bootstrap output:</p>
-<pre><code>project_id            = "prodx-dev"
-cloudflare_api_token  = "your-cloudflare-api-token"
-cloudflare_account_id = "your-cloudflare-account-id"</code></pre>
+  <p>Two required values:</p>
+<pre><code>project_id               = "prodx-dev"           # from bootstrap output
+cloudflared_tunnel_token = "eyJh..."             # from step 9.2 (long JWT)</code></pre>
 
   <p>Defaults take care of region (<code>europe-west3</code>), node count, machine type (<code>e2-small</code> spot), Argo CD chart version, etc. Override in the same file if you want different values.</p>
 
   <h3>Initialize</h3>
 <pre><code>terraform init</code></pre>
-  <p>Downloads the google, kubernetes, helm, cloudflare, and random providers and configures the HCP Terraform backend. Takes 20–60 seconds the first time.</p>
+  <p>Downloads the google, kubernetes, and helm providers and configures the HCP Terraform backend. Takes 20–60 seconds the first time.</p>
 
   <h3>First apply (two stages)</h3>
   <p>On a fresh state, the <code>kubernetes</code> and <code>helm</code> providers can't be configured until the cluster exists — chicken-and-egg. Do this once:</p>
@@ -783,7 +785,7 @@ terraform apply</code></pre>
   <p>Total time:</p>
   <ul>
     <li><strong>Stage 1</strong> (VPC + GKE control plane + node pool): 8–12 minutes.</li>
-    <li><strong>Stage 2</strong> (Argo CD Helm chart + Cloudflare tunnel + cloudflared deployment): 3–5 minutes.</li>
+    <li><strong>Stage 2</strong> (Argo CD Helm chart + cloudflared deployment): 3–5 minutes.</li>
   </ul>
 
   <p>Subsequent applies are a single <code>terraform apply</code> and usually finish in under a minute unless you touched the cluster config.</p>
