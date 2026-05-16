@@ -509,11 +509,15 @@ docker compose up --build</code></pre>
   <p>First build takes 2–3 minutes (Node + Python image pulls + frontend npm install). On subsequent runs it's seconds. Once compose finishes:</p>
   <ul>
     <li>Frontend: <a href="http://localhost:8080">http://localhost:8080</a></li>
-    <li>API: <a href="http://localhost:8000/health">http://localhost:8000/health</a></li>
-    <li>Metrics JSON: <a href="http://localhost:8000/api/metrics">http://localhost:8000/api/metrics</a></li>
+    <li>API (direct): <a href="http://localhost:8000/health">http://localhost:8000/health</a>, <a href="http://localhost:8000/api/metrics">http://localhost:8000/api/metrics</a></li>
+    <li>API <em>via the nginx proxy in the web container</em>: <a href="http://localhost:8080/api/metrics">http://localhost:8080/api/metrics</a></li>
   </ul>
 
   <p>The React Flow canvas loads the <code>prodx</code> graph seeded by the API on boot — a small diagram of Browser → Nginx → FastAPI → Postgres / Redis. The right-hand panel polls <code>/api/metrics</code> every 5s and shows status dots for each dependency.</p>
+
+  <div class="callout note">
+    <p><strong>Same image, every environment.</strong> The published <code>pbdaemon/prodx-web</code> image doesn't bake any API URL at build time. Its nginx config proxies <code>/api/*</code> to the upstream service name <code>prodx-api</code> — which resolves via Docker Compose service-name DNS in local compose, and via Kubernetes Service DNS in the cluster. That's why <code>http://localhost:8080/api/metrics</code> works here and <code>https://prodx.pbcv.dev/api/metrics</code> works in production, with the same exact image and zero env-var overrides.</p>
+  </div>
 
   <div class="callout ok">
     <p><strong>Data persistence.</strong> Postgres lives in a named volume (<code>pg_data</code>). <code>docker compose down</code> keeps the data; <code>docker compose down -v</code> wipes it.</p>
@@ -844,24 +848,100 @@ INF Registered tunnel connection connIndex=3 ...</code></pre>
 </section>
 
 <section id="prodxcd">
-  <h2><span class="step">13</span>Next: ProdXCD</h2>
+  <h2><span class="step">13</span>ProdXCD + the root Argo Application</h2>
 
-  <p>The cluster is empty except for Argo CD and cloudflared. The <strong>ProdXCD</strong> repo (still being built) will contain:</p>
+  <p>This is the last piece that closes the loop: a Helm chart in a separate repo (<a href="https://github.com/DemOnJR/ProdXCD"><code>ProdXCD</code></a>) that Argo CD pulls from, plus a one-time <code>Application</code> resource in ProdXTF that registers the chart with Argo. Once both are in place, every push to ProdX → CI builds → Docker Hub → Argo detects → cluster reconciles. No <code>kubectl apply</code> ever leaves your laptop.</p>
+
+  <h3>13.1 — The ProdXCD Helm chart</h3>
+  <p>Layout:</p>
+<pre><code>ProdXCD/
+└── charts/
+    └── prodx/
+        ├── Chart.yaml                        name: prodx, version: 0.1.0
+        ├── values.yaml                       image tags, replicas, storage sizes, resource limits
+        └── templates/
+            ├── _helpers.tpl                  common labels
+            ├── secret-postgres.yaml          POSTGRES_USER/PASSWORD/DB + DATABASE_URL
+            ├── postgres-statefulset.yaml     1Gi PVC, standard-rwo, pg_isready probes
+            ├── postgres-service.yaml         headless ClusterIP, port 5432
+            ├── redis-statefulset.yaml        256Mi PVC, --appendonly yes, ping probes
+            ├── redis-service.yaml            headless ClusterIP, port 6379
+            ├── prodx-api-deployment.yaml     pbdaemon/prodx-api:latest, /health probes
+            ├── prodx-api-service.yaml        ClusterIP, port 8000
+            ├── prodx-web-deployment.yaml     pbdaemon/prodx-web:latest
+            └── prodx-web-service.yaml        ClusterIP, port 80</code></pre>
+
+  <p>Two design choices worth calling out:</p>
   <ul>
-    <li>A root Argo <code>Application</code> ("app-of-apps") pointing Argo CD at this repo.</li>
-    <li>Kustomize/Helm manifests for the ProdX <code>Deployment</code>s + <code>Service</code>s in the <code>prodx</code> namespace.</li>
-    <li><code>StatefulSet</code>s for Postgres + Redis with PersistentVolumeClaims.</li>
-    <li>Image tags pinned to whatever's in Docker Hub (initially <code>:latest</code>; later, the GitHub Actions workflow bumps these on every <code>main</code> build).</li>
+    <li><strong><code>imagePullPolicy: Always</code> on both Deployments.</strong> The chart uses floating <code>:latest</code> tags, so on every pod restart Docker Hub is hit for a fresh manifest. Trade-off: more pulls, but you can ship a new image to Docker Hub and <code>kubectl rollout restart deployment/prodx-api -n prodx</code> picks it up immediately. The cleaner upgrade path (image-digest bumping by CI) is a future enhancement.</li>
+    <li><strong>StatefulSets for Postgres + Redis with PVCs.</strong> GKE's default <code>standard-rwo</code> StorageClass provisions a Persistent Disk (<code>pd-standard</code>) per PVC. Data survives pod restarts and node replacements. Roughly $0.04/GB/month for the underlying PDs.</li>
   </ul>
 
-  <p>Once ProdXCD is in place and you've added it as an Argo CD Application:</p>
-  <ol>
-    <li>Argo CD detects the manifests, creates the resources.</li>
-    <li>cluster pulls <code>pbdaemon/prodx-api</code> + <code>pbdaemon/prodx-web</code> from Docker Hub.</li>
-    <li>cloudflared was already wired to <code>prodx-web.prodx.svc.cluster.local</code> and <code>prodx-api.prodx.svc.cluster.local</code> — so the 502s flip to 200s the moment the pods are <code>Ready</code>.</li>
-  </ol>
+  <h3>13.2 — The root Argo Application (in ProdXTF)</h3>
+  <p>Argo CD doesn't auto-discover anything. We need one <code>Application</code> resource that says "watch this Git repo, render the chart at this path, sync into this namespace". Terraform creates it via <code>kubernetes_manifest</code> in <code>envs/dev/argocd_apps.tf</code>:</p>
+<pre><code>resource "kubernetes_manifest" "prodx_root_app" {
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata   = { name = "prodx", namespace = "argocd",
+                   finalizers = ["resources-finalizer.argocd.argoproj.io"] }
+    spec = {
+      project     = "default"
+      source      = { repoURL = "https://github.com/DemOnJR/ProdXCD.git"
+                      targetRevision = "main", path = "charts/prodx",
+                      helm = { releaseName = "prodx" } }
+      destination = { server = "https://kubernetes.default.svc", namespace = "prodx" }
+      syncPolicy  = {
+        automated   = { prune = true, selfHeal = true }
+        syncOptions = ["CreateNamespace=true", "ServerSideApply=true"]
+        retry       = { limit = 5, backoff = { duration = "5s", factor = 2, maxDuration = "5m" } }
+      }
+    }
+  }
+  depends_on = [module.argocd]
+}</code></pre>
 
-  <p>No DNS changes, no Terraform changes, no new secrets. That's the GitOps payoff.</p>
+  <p>Apply with <code>terraform apply</code> in <code>envs/dev</code>. Argo CD detects the Application within ~30s and starts the first sync.</p>
+
+  <div class="callout note">
+    <p><strong>Why this resource lives in ProdXTF, not ProdXCD.</strong> The Application is the <em>bootstrap link</em> between the cluster and ProdXCD; it has to come from somewhere outside ProdXCD itself. Putting it in TF keeps the "cluster bootstrap" story end-to-end Terraform-managed. Once it's in place, every future workload can be added by writing a new Argo <code>Application</code> manifest <em>into</em> ProdXCD — no more TF changes needed.</p>
+  </div>
+
+  <h3>13.3 — Verify the loop closed</h3>
+<pre><code># Argo CD's view
+kubectl -n argocd get application prodx
+#   NAME    SYNC STATUS   HEALTH STATUS
+#   prodx   Synced        Healthy
+
+# Cluster state
+kubectl -n prodx get pods,svc,pvc
+#   8 resources: 4 pods (postgres, redis, prodx-api, prodx-web),
+#   4 services, 2 PVCs
+
+# End-to-end smoke test
+curl -s https://prodxapi.pbcv.dev/api/metrics | jq
+#   { "status": "healthy", "dependencies": { "postgres": {...}, "redis": {...} },
+#     "graph_count": 1 }
+
+curl -sI https://prodx.pbcv.dev
+#   HTTP/2 200   (the SPA loads, served via Cloudflare Tunnel + cloudflared + nginx)
+
+curl -s https://prodx.pbcv.dev/api/metrics
+#   Same JSON as prodxapi.pbcv.dev -- proves the in-pod nginx /api/ proxy works
+#   so the SPA can use relative URLs.</code></pre>
+
+  <h3>13.4 — The GitOps loop, demoed</h3>
+  <p>Try this once everything is up:</p>
+  <ol>
+    <li>Edit <code>ProdX/backend/app/seed.py</code> — change one node's label.</li>
+    <li><code>git commit -am "tweak graph label" &amp;&amp; git push</code> to ProdX.</li>
+    <li>Watch <a href="https://github.com/DemOnJR/ProdX/actions">GitHub Actions</a> build + push new <code>:latest</code> images to Docker Hub (~2 min).</li>
+    <li>Force a pod restart so it pulls the new image:
+<pre><code>kubectl -n prodx rollout restart deployment/prodx-api</code></pre>
+    </li>
+    <li>Refresh <a href="https://prodx.pbcv.dev">prodx.pbcv.dev</a> — the new label is live.</li>
+  </ol>
+  <p>You never <code>kubectl apply</code>-ed a manifest. You never touched a cloud console. The change propagated entirely through Git → CI → registry → cluster pull.</p>
 </section>
 
 <section id="teardown">
@@ -869,10 +949,20 @@ INF Registered tunnel connection connIndex=3 ...</code></pre>
 
   <h3>Daily / between sessions — keep the project, kill the cluster</h3>
   <p>To preserve free-trial credit while not actively working:</p>
-<pre><code>cd ProdXTF\envs\dev
+<pre><code># Optional: delete the Argo Application first so Argo CD removes the
+# prodx namespace gracefully (including PVCs -- otherwise they orphan
+# as 1Gi Persistent Disks at ~$0.04/GB/month each).
+kubectl -n argocd delete application prodx
+kubectl wait --for=delete namespace/prodx --timeout=120s
+
+cd ProdXTF/envs/dev
 terraform destroy</code></pre>
 
-  <p>This removes the GKE cluster, the VPC, the Argo CD release, the Cloudflare Tunnel, and the three DNS records — about 4–8 minutes. State stays in HCP Terraform so the next <code>apply</code> rebuilds everything from the same config. The GCP project and tag binding stay; the project alone costs $0/month.</p>
+  <p>This removes the cloudflared deployment, the Argo CD release, the GKE cluster, and the VPC — about 4–8 minutes. State stays in HCP Terraform so the next <code>apply</code> rebuilds everything from the same config. The GCP project stays; the project alone costs $0/month.</p>
+
+  <div class="callout warn">
+    <p><strong>About the kubectl delete step:</strong> if you skip it and go straight to <code>terraform destroy</code>, the cluster's PVs/PDs <em>may</em> survive cluster deletion and keep billing. The Argo Application's <code>resources-finalizer.argocd.argoproj.io</code> ensures Argo CD removes child resources (PVCs included) when the Application is deleted. <strong>If you forgot:</strong> check <code>gcloud compute disks list --project prodx-dev</code> for orphans and delete them with <code>gcloud compute disks delete &lt;name&gt; --zone europe-west3-a</code>.</p>
+  </div>
 
   <h3>Full wipe — destroy the project too</h3>
   <p>Done with the project entirely:</p>
