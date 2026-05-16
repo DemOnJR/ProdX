@@ -574,15 +574,17 @@ git push</code></pre>
 <pre><code>winget install Google.CloudSDK
 gcloud auth login
 gcloud auth application-default login
-gcloud config set project &lt;your-project-id&gt;</code></pre>
+gcloud config set project &lt;your-project-id&gt;
+gcloud auth application-default set-quota-project &lt;your-project-id&gt;</code></pre>
 
   <p>The two <code>auth</code> commands are different — and you need both:</p>
   <ul>
     <li><code>gcloud auth login</code> — credentials for the <code>gcloud</code> CLI itself (kubectl, etc.).</li>
     <li><code>gcloud auth application-default login</code> — credentials Terraform's google provider picks up automatically.</li>
   </ul>
+  <p>The final <code>set-quota-project</code> line pins your ADC's billing/quota project to the one you just selected. Skip it and gcloud will warn on every command that your active project doesn't match the ADC's quota project (see <a href="#gcp-warnings">below</a>).</p>
 
-  <h3>Common warnings after <code>gcloud config set project</code></h3>
+  <h3 id="gcp-warnings">Common warnings after <code>gcloud config set project</code></h3>
   <p>On your first project switch, gcloud usually prints one or two advisory warnings. Neither blocks <code>terraform apply</code>, but both have clean fixes:</p>
 
   <h4>1. "Your active project does not match the quota project in your local Application Default Credentials file"</h4>
