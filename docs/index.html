@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProdX — DevOps Capstone Tutorial</title>
+<style>
+:root {
+  --bg: #0b1020;
+  --panel: #111a33;
+  --panel-2: #0e1530;
+  --border: #22304f;
+  --border-strong: #2e3e63;
+  --text: #e6ecff;
+  --muted: #9aa7c7;
+  --faint: #6c789a;
+  --accent: #7c3aed;
+  --accent-2: #06b6d4;
+  --ok: #10b981;
+  --warn: #f59e0b;
+  --bad: #ef4444;
+  --code-bg: #06091a;
+  --code-border: #1a2548;
+  --link: #8ab4ff;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+header.hero {
+  padding: 56px 24px 40px;
+  background: linear-gradient(180deg, #131c3a 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+header.hero h1 {
+  margin: 0 0 8px;
+  font-size: 44px;
+  letter-spacing: -0.5px;
+  background: linear-gradient(90deg, #c4b5fd, #67e8f9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+header.hero p { margin: 0; color: var(--muted); font-size: 17px; }
+header.hero .meta {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--faint);
+  display: inline-flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  max-width: 1280px;
+  margin: 0 auto;
+  gap: 32px;
+  padding: 32px 24px 80px;
+}
+
+aside.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  font-size: 13.5px;
+  border-right: 1px solid var(--border);
+  padding-right: 16px;
+}
+aside.toc h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--faint);
+  margin: 0 0 12px;
+}
+aside.toc ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+aside.toc li { margin: 4px 0; }
+aside.toc a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  border-left: 2px solid transparent;
+}
+aside.toc a:hover { color: var(--text); background: var(--panel-2); text-decoration: none; }
+aside.toc a.active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-left-color: var(--accent);
+}
+
+main { min-width: 0; }
+
+section { margin: 0 0 56px; scroll-margin-top: 24px; }
+section h2 {
+  font-size: 28px;
+  margin: 0 0 8px;
+  letter-spacing: -0.3px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+section h2 .step {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-2);
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  border-radius: 999px;
+  padding: 2px 10px;
+  vertical-align: middle;
+  margin-right: 10px;
+}
+section h3 {
+  font-size: 18px;
+  margin: 28px 0 8px;
+  color: #c8d3ff;
+}
+section h4 {
+  font-size: 15px;
+  margin: 20px 0 6px;
+  color: #b6c0e0;
+}
+section p { margin: 10px 0; }
+section ul, section ol { padding-left: 22px; }
+section li { margin: 4px 0; }
+
+code {
+  font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: #d2dcff;
+}
+
+pre {
+  position: relative;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 12px 0;
+  font-size: 13px;
+}
+pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: #d2dcff;
+  white-space: pre;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s;
+  font-family: inherit;
+}
+pre:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: var(--panel-2); color: var(--text); }
+.copy-btn.copied { background: var(--ok); color: #062018; border-color: var(--ok); }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 14px 0;
+  font-size: 14px;
+}
+th, td {
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+}
+th { background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+tr:hover td { background: rgba(124, 58, 237, 0.04); }
+
+.callout {
+  margin: 14px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  color: var(--muted);
+  font-size: 14px;
+}
+.callout strong { color: var(--text); }
+.callout.note { border-left-color: var(--accent-2); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.danger { border-left-color: var(--bad); }
+.callout.ok { border-left-color: var(--ok); }
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+
+.diagram {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  padding: 18px;
+  margin: 16px 0;
+  overflow-x: auto;
+}
+.diagram pre {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: #b6c0e0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.diagram .legend {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--faint);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--panel);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.repo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.repo-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.repo-card h4 { margin: 0 0 6px; color: var(--text); font-size: 15px; }
+.repo-card p { margin: 0; font-size: 13px; color: var(--muted); }
+.repo-card .tag {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  background: rgba(124, 58, 237, 0.15);
+  color: #c4b5fd;
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+footer {
+  border-top: 1px solid var(--border);
+  padding: 24px;
+  text-align: center;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+@media (max-width: 880px) {
+  .layout { grid-template-columns: 1fr; }
+  aside.toc {
+    position: static;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+  }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>ProdX</h1>
+  <p>An ITSchool DevOps capstone — full setup tutorial, zero to live</p>
+  <div class="meta">
+    <span>FastAPI · React + React Flow · PostgreSQL · Redis</span>
+    <span>GKE · Argo CD · Cloudflare Tunnel</span>
+    <span>Terraform · HCP Terraform · GitHub Actions · Docker Hub</span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <h2>Tutorial</h2>
+    <nav>
+      <ol>
+        <li><a href="#overview">1. Overview</a></li>
+        <li><a href="#architecture">2. Architecture</a></li>
+        <li><a href="#prereqs">3. Prerequisites</a></li>
+        <li><a href="#clone">4. Clone the repos</a></li>
+        <li><a href="#local">5. Run ProdX locally</a></li>
+        <li><a href="#ci">6. Docker Hub + GitHub CI</a></li>
+        <li><a href="#gcp">7. Google Cloud setup</a></li>
+        <li><a href="#hcp">8. HCP Terraform setup</a></li>
+        <li><a href="#cloudflare">9. Cloudflare setup</a></li>
+        <li><a href="#apply">10. terraform apply</a></li>
+        <li><a href="#verify">11. Verify it works</a></li>
+        <li><a href="#prodxcd">12. Next: ProdXCD</a></li>
+        <li><a href="#teardown">13. Teardown</a></li>
+        <li><a href="#troubleshooting">14. Troubleshooting</a></li>
+      </ol>
+    </nav>
+  </aside>
+
+<main>
+
+<section id="overview">
+  <h2><span class="step">01</span>Overview</h2>
+  <p>
+    ProdX is a small full-stack web app (FastAPI + React) packaged with a complete DevOps pipeline around it.
+    The point of the project isn't the app — it's the path the app takes to get into production:
+    code → CI → container registry → Terraform-provisioned cluster → GitOps reconciler → publicly reachable URL.
+  </p>
+
+  <p>The work is split across three GitHub repositories so the boundaries between
+    <em>app code</em>, <em>infrastructure</em>, and <em>cluster state</em> stay clean:</p>
+
+  <div class="repo-grid">
+    <div class="repo-card">
+      <h4>ProdX</h4>
+      <p>FastAPI backend, React + React Flow frontend, Postgres, Redis. Local <code>docker compose</code> stack and the GitHub Actions workflow that builds + publishes images to Docker Hub.</p>
+      <span class="tag">App</span>
+    </div>
+    <div class="repo-card">
+      <h4>ProdXTF</h4>
+      <p>Terraform for the cluster: VPC + GKE + Argo CD + Cloudflare Tunnel. State lives in HCP Terraform; execution runs locally against your <code>gcloud</code> credentials.</p>
+      <span class="tag">Infrastructure</span>
+    </div>
+    <div class="repo-card">
+      <h4>ProdXCD</h4>
+      <p>Argo CD <code>Application</code> manifests + Kustomize/Helm for ProdX. Argo CD watches this repo and reconciles the cluster — CI never <code>kubectl apply</code>s anything.</p>
+      <span class="tag">GitOps</span>
+    </div>
+  </div>
+
+  <h3>Tech stack</h3>
+  <table>
+    <thead><tr><th>Layer</th><th>What</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Backend</td><td>FastAPI on Python 3.12, SQLAlchemy 2, Redis</td><td>Type-checked, small, batteries-included.</td></tr>
+      <tr><td>Frontend</td><td>React 18 + Vite + <code>@xyflow/react</code></td><td>React Flow renders the project's own architecture as an interactive graph.</td></tr>
+      <tr><td>Datastore</td><td>PostgreSQL 16 (JSONB), Redis 7</td><td>Graph payload in JSONB; Redis is a read-through cache.</td></tr>
+      <tr><td>Local dev</td><td>Docker Compose</td><td>One command to run everything.</td></tr>
+      <tr><td>CI</td><td>GitHub Actions → Docker Hub</td><td>Build + push on push to <code>main</code> and tags.</td></tr>
+      <tr><td>Cluster</td><td>GKE Standard zonal, <code>e2-small</code> spot nodes, autoscaler 1→3</td><td>Cheap enough to fit inside GCP's $300 free trial credit.</td></tr>
+      <tr><td>IaC</td><td>Terraform 1.9+ with HCP Terraform backend</td><td>Modules + envs split; state out of the repo.</td></tr>
+      <tr><td>GitOps</td><td>Argo CD via Helm</td><td>Cluster pulls from Git; CI never pushes to the cluster.</td></tr>
+      <tr><td>Public entry</td><td>Cloudflare Tunnel + <code>cloudflared</code> Deployment</td><td>No LoadBalancer, no cert-manager — TLS terminates at CF edge.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="architecture">
+  <h2><span class="step">02</span>Architecture</h2>
+
+  <h3>Runtime (what happens when a user opens <code>prodx.pbcv.dev</code>)</h3>
+  <div class="diagram">
+<pre>                Browser
+                   │  HTTPS
+                   ▼
+       ┌──────────────────────────┐
+       │  Cloudflare edge (TLS)   │
+       └──────────────┬───────────┘
+                      │
+              Cloudflare Tunnel
+              (outbound from cluster, no inbound ports)
+                      │
+       ┌──────────────┴───────────────────┐
+       │  cloudflared Deployment (2 pods) │
+       │  reads ingress rules from CF API │
+       └──┬────────────┬──────────────┬───┘
+          │            │              │
+          ▼            ▼              ▼
+   argocd-server   prodx-web      prodx-api
+   (Argo CD)       (nginx +       (FastAPI
+                    React SPA)     :8000)
+                                      │
+                              ┌───────┴───────┐
+                              ▼               ▼
+                          PostgreSQL        Redis
+                          (JSONB graph)     (cache)
+
+                  ── GKE cluster (europe-west3-a) ──</pre>
+    <div class="legend">
+      <span>↓ TLS terminates at Cloudflare. Cluster has no public IP.</span>
+    </div>
+  </div>
+
+  <h3>GitOps flow (what happens when you push code)</h3>
+  <div class="diagram">
+<pre>  Developer push to ProdX repo
+              │
+              ▼
+       GitHub Actions
+   build pbdaemon/prodx-api
+   build pbdaemon/prodx-web
+              │
+              ▼
+         Docker Hub
+              │
+              │   (future: CI also bumps image tag in ProdXCD)
+              ▼
+        ProdXCD repo
+              │
+              │   Argo CD polls every ~3min
+              ▼
+        Argo CD (in-cluster)
+              │
+              ▼
+         GKE cluster</pre>
+    <div class="legend">
+      <span>CI never holds cluster credentials. The cluster pulls — CI pushes only to Git and Docker Hub.</span>
+    </div>
+  </div>
+</section>
+
+<section id="prereqs">
+  <h2><span class="step">03</span>Prerequisites</h2>
+
+  <h3>Tools to install</h3>
+  <table>
+    <thead><tr><th>Tool</th><th>Why</th><th>Install (Windows / winget)</th></tr></thead>
+    <tbody>
+      <tr><td>Git</td><td>Clone + push</td><td><code>winget install Git.Git</code></td></tr>
+      <tr><td>Docker Desktop</td><td>Run the local stack, build images</td><td><code>winget install Docker.DockerDesktop</code></td></tr>
+      <tr><td>gcloud CLI</td><td>Authenticate Terraform to GCP, kubeconfig</td><td><code>winget install Google.CloudSDK</code></td></tr>
+      <tr><td>Terraform</td><td>Provision GCP + Cloudflare</td><td><code>winget install Hashicorp.Terraform</code></td></tr>
+      <tr><td>kubectl</td><td>Talk to the cluster</td><td>Installed with gcloud (<code>gcloud components install kubectl</code>) or <code>winget install Kubernetes.kubectl</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Accounts you'll need</h3>
+  <ul>
+    <li><strong>GitHub</strong> — to host the three repos.</li>
+    <li><strong>Docker Hub</strong> (free) — to host the built images.</li>
+    <li><strong>Google Cloud</strong> — free trial gives you $300 / 90 days, plenty for the cluster.</li>
+    <li><strong>HCP Terraform</strong> (free tier, formerly "Terraform Cloud") — for remote state.</li>
+    <li><strong>Cloudflare</strong> with a managed zone — the tutorial uses <code>pbcv.dev</code>; substitute your own.</li>
+  </ul>
+
+  <div class="callout warn">
+    <p><strong>Cost reality check.</strong> GKE charges ~$73/month for the control plane on both Standard and Autopilot. Add a single <code>e2-small</code> spot node (~$5) and you're at roughly $80/month. The $300 free trial credit covers the whole course term comfortably, but <strong>tear the cluster down when you're not actively working on it</strong> if you want the credit to stretch.</p>
+  </div>
+</section>
+
+<section id="clone">
+  <h2><span class="step">04</span>Clone the repos</h2>
+  <p>Pick a workspace folder. The tutorial assumes a single parent directory holds all three repos side-by-side.</p>
+<pre><code>mkdir prodx-workspace
+cd prodx-workspace
+git clone https://github.com/DemOnJR/ProdX.git
+git clone https://github.com/DemOnJR/ProdXTF.git
+git clone https://github.com/DemOnJR/ProdXCD.git</code></pre>
+  <p>If you're forking instead of using these repos directly, replace <code>DemOnJR</code> with your GitHub username everywhere in this tutorial.</p>
+</section>
+
+<section id="local">
+  <h2><span class="step">05</span>Run ProdX locally with Docker Compose</h2>
+  <p>Before touching any cloud, verify the app runs on your machine.</p>
+<pre><code>cd ProdX
+docker compose up --build</code></pre>
+  <p>First build takes 2–3 minutes (Node + Python image pulls + frontend npm install). On subsequent runs it's seconds. Once compose finishes:</p>
+  <ul>
+    <li>Frontend: <a href="http://localhost:8080">http://localhost:8080</a></li>
+    <li>API: <a href="http://localhost:8000/health">http://localhost:8000/health</a></li>
+    <li>Metrics JSON: <a href="http://localhost:8000/api/metrics">http://localhost:8000/api/metrics</a></li>
+  </ul>
+
+  <p>The React Flow canvas loads the <code>prodx</code> graph seeded by the API on boot — a small diagram of Browser → Nginx → FastAPI → Postgres / Redis. The right-hand panel polls <code>/api/metrics</code> every 5s and shows status dots for each dependency.</p>
+
+  <div class="callout ok">
+    <p><strong>Data persistence.</strong> Postgres lives in a named volume (<code>pg_data</code>). <code>docker compose down</code> keeps the data; <code>docker compose down -v</code> wipes it.</p>
+  </div>
+</section>
+
+<section id="ci">
+  <h2><span class="step">06</span>Docker Hub + GitHub CI</h2>
+
+  <h3>Create a Docker Hub access token</h3>
+  <ol>
+    <li>Sign in at <a href="https://hub.docker.com/">hub.docker.com</a>.</li>
+    <li>Account Settings → Security → <strong>New Access Token</strong>.</li>
+    <li>Scope: <strong>Read, Write, Delete</strong>. Description: <code>prodx-ci</code>.</li>
+    <li>Copy the token — Docker Hub only shows it once.</li>
+  </ol>
+
+  <h3>Add the secrets to the ProdX repo</h3>
+  <p>On GitHub: <strong>Settings → Secrets and variables → Actions → New repository secret</strong>. Create exactly these names:</p>
+  <table>
+    <thead><tr><th>Name</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td><code>DOCKERHUB_USERNAME</code></td><td>Your Docker Hub username (e.g. <code>pbdaemon</code>)</td></tr>
+      <tr><td><code>DOCKERHUB_TOKEN</code></td><td>The access token from above</td></tr>
+    </tbody>
+  </table>
+
+  <h3>How the workflow behaves</h3>
+  <p>The workflow at <code>.github/workflows/docker-publish.yml</code>:</p>
+  <ul>
+    <li>builds <strong>both</strong> Dockerfiles in parallel via Buildx with GitHub Actions cache;</li>
+    <li>on <strong>pull requests</strong>: builds only, doesn't push;</li>
+    <li>on <strong>push to <code>main</code></strong>: pushes <code>:main</code>, <code>:latest</code>, and <code>:sha-xxxxxxx</code>;</li>
+    <li>on a <strong>tag <code>v1.2.3</code></strong>: pushes <code>:1.2.3</code> + the SHA tag too.</li>
+  </ul>
+
+  <p>Trigger the first run by pushing anything (or just an empty commit):</p>
+<pre><code>git commit --allow-empty -m "trigger CI"
+git push</code></pre>
+
+  <p>Watch the run in the <strong>Actions</strong> tab on GitHub. When it goes green, your images appear at:</p>
+  <ul>
+    <li><code>https://hub.docker.com/r/pbdaemon/prodx-api</code></li>
+    <li><code>https://hub.docker.com/r/pbdaemon/prodx-web</code></li>
+  </ul>
+</section>
+
+<section id="gcp">
+  <h2><span class="step">07</span>Google Cloud setup</h2>
+
+  <h3>Create a project and link billing</h3>
+  <ol>
+    <li>Sign up at <a href="https://cloud.google.com/free">cloud.google.com/free</a> if you haven't already — claim the $300 / 90-day trial.</li>
+    <li>Create a project at <a href="https://console.cloud.google.com/projectcreate">console.cloud.google.com/projectcreate</a>. Pick a globally-unique <strong>project ID</strong> like <code>prodx-dev-abc12</code>. <em>Note the ID, not the name — they can differ.</em></li>
+    <li>Make sure the project is linked to your billing account: <a href="https://console.cloud.google.com/billing/linkedaccount">Billing → Linked account</a>. Trial credit attaches to the billing account, which then funds the project.</li>
+  </ol>
+
+  <h3>Install + authenticate the gcloud CLI</h3>
+<pre><code>winget install Google.CloudSDK
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project &lt;your-project-id&gt;</code></pre>
+
+  <p>The two <code>auth</code> commands are different — and you need both:</p>
+  <ul>
+    <li><code>gcloud auth login</code> — credentials for the <code>gcloud</code> CLI itself (kubectl, etc.).</li>
+    <li><code>gcloud auth application-default login</code> — credentials Terraform's google provider picks up automatically.</li>
+  </ul>
+
+  <h3>Enable the APIs Terraform will call</h3>
+<pre><code>gcloud services enable `
+  compute.googleapis.com `
+  container.googleapis.com `
+  iam.googleapis.com `
+  cloudresourcemanager.googleapis.com</code></pre>
+  <p><span class="kbd">`</span> at end of line is PowerShell line continuation. On bash, use <span class="kbd">\</span> instead.</p>
+
+  <div class="callout note">
+    <p><strong>Why these four?</strong> <code>compute</code> for VPC + VMs, <code>container</code> for GKE, <code>iam</code> for service accounts, <code>cloudresourcemanager</code> so Terraform can read project metadata.</p>
+  </div>
+</section>
+
+<section id="hcp">
+  <h2><span class="step">08</span>HCP Terraform setup</h2>
+
+  <p>"Terraform Cloud" was renamed to "HCP Terraform" in 2024 — same product, same free tier (up to 5 users).</p>
+
+  <ol>
+    <li>Sign up at <a href="https://app.terraform.io/signup/account">app.terraform.io/signup/account</a>.</li>
+    <li><strong>Create an organization</strong> — e.g. <code>prodx-demonjr</code>. Note the org name.</li>
+    <li><strong>Create a workspace</strong>:
+      <ul>
+        <li>Type: <strong>CLI-driven workflow</strong> (not VCS, not API).</li>
+        <li>Name: <code>prodx-dev</code>.</li>
+      </ul>
+    </li>
+    <li>Open the new workspace → <strong>Settings → General → Execution Mode → Local</strong>. Save.
+      <div class="callout note">
+        <p><strong>Why local execution?</strong> Remote execution requires uploading GCP + Cloudflare credentials to HCP Terraform. Local execution runs <code>terraform apply</code> on your machine using your <code>gcloud</code> ADC and your <code>terraform.tfvars</code>; only the state file lives in HCP. Simpler to start with — we can switch to remote execution + workload identity federation later.</p>
+      </div>
+    </li>
+    <li>On your machine, log Terraform into HCP:
+<pre><code>winget install Hashicorp.Terraform
+terraform login</code></pre>
+      A browser window opens, you approve, and a token is written to <code>~/.terraform.d/credentials.tfrc.json</code>.</li>
+  </ol>
+
+  <h3>Wire the backend to your org</h3>
+  <p>In <code>ProdXTF/envs/dev/versions.tf</code>, replace the placeholder:</p>
+<pre><code>cloud {
+  organization = "REPLACE_ME_TFC_ORG"   ← change to your HCP Terraform org name
+  workspaces {
+    name = "prodx-dev"
+  }
+}</code></pre>
+</section>
+
+<section id="cloudflare">
+  <h2><span class="step">09</span>Cloudflare setup</h2>
+
+  <h3>Add the zone</h3>
+  <p>Your domain (<code>pbcv.dev</code> in this tutorial) must be a zone in your Cloudflare account. If it isn't yet: dashboard → <strong>Add a site</strong> → pick the Free plan → change nameservers at your registrar to the two CF nameservers shown. Wait until CF reports the zone as <em>Active</em> (usually under an hour).</p>
+
+  <h3>Get your Account ID</h3>
+  <p>Open any zone in the dashboard. The right sidebar shows <strong>Account ID</strong> (a 32-character hex string). Copy it.</p>
+
+  <h3>Create an API token</h3>
+  <ol>
+    <li>Go to <a href="https://dash.cloudflare.com/profile/api-tokens">dash.cloudflare.com/profile/api-tokens</a>.</li>
+    <li><strong>Create Token</strong> → <strong>Custom token</strong>.</li>
+    <li>Name: <code>prodx-terraform</code>.</li>
+    <li>Permissions:
+      <table>
+        <thead><tr><th>Scope</th><th>Resource</th><th>Access</th></tr></thead>
+        <tbody>
+          <tr><td>Account</td><td>Cloudflare Tunnel</td><td>Edit</td></tr>
+          <tr><td>Account</td><td>Account Settings</td><td>Read</td></tr>
+          <tr><td>Zone</td><td>DNS</td><td>Edit</td></tr>
+          <tr><td>Zone</td><td>Zone</td><td>Read</td></tr>
+        </tbody>
+      </table>
+    </li>
+    <li>Zone Resources: <strong>Include → Specific zone → <code>pbcv.dev</code></strong>.</li>
+    <li>Continue → Create. <strong>Copy the token immediately</strong> — Cloudflare only shows it once.</li>
+  </ol>
+
+  <div class="callout danger">
+    <p><strong>This token is a secret.</strong> Don't paste it into Git, screenshots, or chat. It goes into <code>terraform.tfvars</code>, which is gitignored.</p>
+  </div>
+</section>
+
+<section id="apply">
+  <h2><span class="step">10</span>terraform apply</h2>
+
+  <h3>Create your local tfvars file</h3>
+<pre><code>cd ProdXTF\envs\dev
+copy terraform.tfvars.example terraform.tfvars
+notepad terraform.tfvars</code></pre>
+
+  <p>Fill in the three required values:</p>
+<pre><code>project_id            = "prodx-dev-abc12"
+cloudflare_api_token  = "your-cloudflare-api-token"
+cloudflare_account_id = "your-cloudflare-account-id"</code></pre>
+
+  <p>Defaults take care of region (<code>europe-west3</code>), node count, machine type (<code>e2-small</code> spot), Argo CD chart version, etc. Override in the same file if you want different values.</p>
+
+  <h3>Initialize</h3>
+<pre><code>terraform init</code></pre>
+  <p>Downloads the google, kubernetes, helm, cloudflare, and random providers and configures the HCP Terraform backend. Takes 20–60 seconds the first time.</p>
+
+  <h3>First apply (two stages)</h3>
+  <p>On a fresh state, the <code>kubernetes</code> and <code>helm</code> providers can't be configured until the cluster exists — chicken-and-egg. Do this once:</p>
+<pre><code>terraform apply -target=module.network -target=module.cluster
+terraform apply</code></pre>
+
+  <p>Total time:</p>
+  <ul>
+    <li><strong>Stage 1</strong> (VPC + GKE control plane + node pool): 8–12 minutes.</li>
+    <li><strong>Stage 2</strong> (Argo CD Helm chart + Cloudflare tunnel + cloudflared deployment): 3–5 minutes.</li>
+  </ul>
+
+  <p>Subsequent applies are a single <code>terraform apply</code> and usually finish in under a minute unless you touched the cluster config.</p>
+
+  <div class="callout note">
+    <p><strong>Why two stages only on the first run?</strong> After the cluster exists, Terraform can read its endpoint at plan time, the provider config resolves, and helm + kubernetes resources plan cleanly in one pass.</p>
+  </div>
+</section>
+
+<section id="verify">
+  <h2><span class="step">11</span>Verify it works</h2>
+
+  <h3>Get cluster credentials and check the pods</h3>
+<pre><code>terraform output -raw get_credentials_command | Invoke-Expression
+
+kubectl get nodes
+kubectl get pods -A</code></pre>
+
+  <p>You should see:</p>
+  <ul>
+    <li>1 node in <code>Ready</code> state.</li>
+    <li>Argo CD pods in the <code>argocd</code> namespace (<code>argocd-server</code>, <code>argocd-repo-server</code>, <code>argocd-application-controller</code>, …).</li>
+    <li>2 <code>cloudflared</code> pods in the <code>cloudflared</code> namespace.</li>
+  </ul>
+
+  <h3>Confirm the tunnel is connected</h3>
+<pre><code>kubectl -n cloudflared logs deploy/cloudflared --tail=40</code></pre>
+
+  <p>Look for lines like:</p>
+<pre><code>INF Registered tunnel connection connIndex=0 ...
+INF Registered tunnel connection connIndex=1 ...
+INF Registered tunnel connection connIndex=2 ...
+INF Registered tunnel connection connIndex=3 ...</code></pre>
+
+  <p>Four registrations per pod = healthy tunnel. Cloudflare uses four edge connections per cloudflared instance for redundancy.</p>
+
+  <h3>Hit the URLs</h3>
+<pre><code>terraform output public_urls</code></pre>
+
+  <ul>
+    <li><strong><code>https://argocd.pbcv.dev</code></strong> → Argo CD login page.</li>
+    <li><strong><code>https://prodx.pbcv.dev</code></strong> → <em>502 Bad Gateway</em> until ProdXCD is deployed (the service doesn't exist yet).</li>
+    <li><strong><code>https://prodxapi.pbcv.dev</code></strong> → <em>502</em>, same reason.</li>
+  </ul>
+
+  <h3>Log into Argo CD</h3>
+<pre><code>terraform output -raw argocd_initial_admin_secret_command | Invoke-Expression</code></pre>
+  <p>That prints the bootstrap password. Username is <code>admin</code>. Log in at <code>https://argocd.pbcv.dev</code>.</p>
+
+  <p>Right after first login, delete the bootstrap secret (good hygiene):</p>
+<pre><code>kubectl -n argocd delete secret argocd-initial-admin-secret</code></pre>
+
+  <div class="callout ok">
+    <p><strong>You now have:</strong> a real GKE cluster, Argo CD waiting for work, two publicly reachable URLs hidden behind Cloudflare's edge with TLS — no LoadBalancers, no cert-manager, no static GCP credentials anywhere on disk.</p>
+  </div>
+</section>
+
+<section id="prodxcd">
+  <h2><span class="step">12</span>Next: ProdXCD</h2>
+
+  <p>The cluster is empty except for Argo CD and cloudflared. The <strong>ProdXCD</strong> repo (still being built) will contain:</p>
+  <ul>
+    <li>A root Argo <code>Application</code> ("app-of-apps") pointing Argo CD at this repo.</li>
+    <li>Kustomize/Helm manifests for the ProdX <code>Deployment</code>s + <code>Service</code>s in the <code>prodx</code> namespace.</li>
+    <li><code>StatefulSet</code>s for Postgres + Redis with PersistentVolumeClaims.</li>
+    <li>Image tags pinned to whatever's in Docker Hub (initially <code>:latest</code>; later, the GitHub Actions workflow bumps these on every <code>main</code> build).</li>
+  </ul>
+
+  <p>Once ProdXCD is in place and you've added it as an Argo CD Application:</p>
+  <ol>
+    <li>Argo CD detects the manifests, creates the resources.</li>
+    <li>cluster pulls <code>pbdaemon/prodx-api</code> + <code>pbdaemon/prodx-web</code> from Docker Hub.</li>
+    <li>cloudflared was already wired to <code>prodx-web.prodx.svc.cluster.local</code> and <code>prodx-api.prodx.svc.cluster.local</code> — so the 502s flip to 200s the moment the pods are <code>Ready</code>.</li>
+  </ol>
+
+  <p>No DNS changes, no Terraform changes, no new secrets. That's the GitOps payoff.</p>
+</section>
+
+<section id="teardown">
+  <h2><span class="step">13</span>Teardown</h2>
+
+  <p>To preserve free-trial credit when you're not using the cluster:</p>
+<pre><code>cd ProdXTF\envs\dev
+terraform destroy</code></pre>
+
+  <p>This removes the GKE cluster, the VPC, the Argo CD release, the Cloudflare Tunnel, and the three DNS records — about 4–8 minutes. State stays in HCP Terraform so the next <code>apply</code> rebuilds everything from the same config.</p>
+
+  <div class="callout warn">
+    <p><strong>Things <code>terraform destroy</code> does NOT clean up:</strong></p>
+    <ul>
+      <li>Container images on Docker Hub (delete in the Docker Hub UI if you want).</li>
+      <li>The GCP project itself (delete at <a href="https://console.cloud.google.com/iam-admin/settings">IAM &amp; Admin → Settings</a> if you're done for good).</li>
+      <li>Your HCP Terraform workspace (delete in the workspace's Settings → Destruction and Deletion).</li>
+      <li>The Cloudflare zone (it's your domain — leave it).</li>
+    </ul>
+  </div>
+</section>
+
+<section id="troubleshooting">
+  <h2><span class="step">14</span>Troubleshooting</h2>
+
+  <h3>CI build fails with <code>denied: requested access to the resource is denied</code></h3>
+  <p>Docker Hub token has the wrong scope, or the secret names in GitHub are wrong. Re-create the token with Read+Write+Delete and double-check the secrets are spelled <code>DOCKERHUB_USERNAME</code> and <code>DOCKERHUB_TOKEN</code> exactly.</p>
+
+  <h3><code>terraform apply</code> errors on the helm release: "Kubernetes cluster unreachable"</h3>
+  <p>Classic first-apply chicken-and-egg. Run the two-stage apply once:</p>
+<pre><code>terraform apply -target=module.network -target=module.cluster
+terraform apply</code></pre>
+
+  <h3><code>Error 403: Project ... is not authorized</code> when calling a GCP API</h3>
+  <p>You skipped the <code>gcloud services enable</code> step or your ADC credentials are stale. Re-run:</p>
+<pre><code>gcloud auth application-default login
+gcloud services enable compute.googleapis.com container.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com</code></pre>
+
+  <h3>Cloudflare API returns <code>Authentication error</code> (code 10000)</h3>
+  <p>Token scopes are missing. Re-issue with the four permissions listed in <a href="#cloudflare">Step 9</a> and the explicit zone include.</p>
+
+  <h3>Tunnel is created but <code>argocd.pbcv.dev</code> returns "DNS_PROBE_FINISHED_NXDOMAIN"</h3>
+  <p>Cloudflare DNS hasn't propagated yet, or the zone isn't <em>Active</em>. Check <a href="https://dash.cloudflare.com">dash.cloudflare.com</a> — your zone should show "Active" and the DNS tab should list three orange-cloud CNAMEs.</p>
+
+  <h3>Tunnel returns 502 for <code>prodx.pbcv.dev</code></h3>
+  <p>Expected until ProdXCD deploys the <code>prodx-web</code> Service. The Argo CD route should still work — if all three 502, the tunnel itself is fine but cloudflared can't reach <em>any</em> in-cluster service (check that the cloudflared pods are in the same cluster and the namespace labels are right).</p>
+
+  <h3>GKE node won't schedule pods, says <code>Insufficient memory</code></h3>
+  <p><code>e2-small</code> has 2 GB total — Argo CD alone uses ~1 GB. If you add ProdX + Postgres + Redis on top, you need a second node or a larger machine. Easy fix: bump <code>cluster_min_nodes = 2</code> in <code>terraform.tfvars</code> and apply, or change <code>cluster_machine_type</code> to <code>e2-medium</code>.</p>
+
+  <h3>I want to nuke the state and start over</h3>
+  <p><strong>Don't.</strong> Run <code>terraform destroy</code> first so cloud resources go away, then delete the HCP Terraform workspace. Nuking state without destroying resources leaves orphaned GCP infrastructure that keeps billing.</p>
+</section>
+
+</main>
+</div>
+
+<footer>
+  ProdX — DevOps capstone · <a href="https://github.com/DemOnJR/ProdX">DemOnJR/ProdX</a> · <a href="https://github.com/DemOnJR/ProdXTF">DemOnJR/ProdXTF</a> · <a href="https://github.com/DemOnJR/ProdXCD">DemOnJR/ProdXCD</a>
+</footer>
+
+<script>
+// Add a copy button to every <pre><code> block.
+document.querySelectorAll('pre').forEach((pre) => {
+  const btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', async () => {
+    const code = pre.querySelector('code')?.innerText ?? pre.innerText;
+    try {
+      await navigator.clipboard.writeText(code);
+      btn.textContent = 'copied';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'copy';
+        btn.classList.remove('copied');
+      }, 1500);
+    } catch {
+      btn.textContent = 'error';
+    }
+  });
+  pre.appendChild(btn);
+});
+
+// TOC scroll-spy: highlight the link for whichever section is closest to the top.
+const sections = Array.from(document.querySelectorAll('main section[id]'));
+const tocLinks = new Map(
+  Array.from(document.querySelectorAll('aside.toc a[href^="#"]'))
+    .map((a) => [a.getAttribute('href').slice(1), a])
+);
+
+function setActive() {
+  const offset = 80;
+  const y = window.scrollY + offset;
+  let current = sections[0]?.id;
+  for (const s of sections) {
+    if (s.offsetTop <= y) current = s.id;
+    else break;
+  }
+  for (const [id, a] of tocLinks) {
+    a.classList.toggle('active', id === current);
+  }
+}
+
+window.addEventListener('scroll', setActive, { passive: true });
+window.addEventListener('load', setActive);
+</script>
+
+</body>
+</html>
