@@ -562,56 +562,37 @@ git push</code></pre>
 </section>
 
 <section id="identity">
-  <h2><span class="step">07</span>Cloud Identity + GCP setup</h2>
+  <h2><span class="step">07</span>Google Cloud setup</h2>
 
-  <p>The goal of this step is to give Terraform <em>everything</em> it needs to manage GCP for you — including project creation. The only things you do by hand are the ones that genuinely can't be Terraformed:</p>
+  <p>Terraform manages everything we need inside GCP: the project, API enablement, the cluster, IAM, networking. The only things you do by hand are the two that genuinely can't be Terraformed: signing up for the free trial (billing account creation needs a payment method) and authenticating gcloud locally.</p>
 
   <table>
-    <thead><tr><th>Resource</th><th>Terraformable?</th><th>Why</th></tr></thead>
+    <thead><tr><th>Resource</th><th>Terraformable?</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td><strong>GCP Organization</strong></td><td>❌ No</td><td>Provisioned automatically when you set up Cloud Identity for a domain you own. Identity-layer, not a TF resource.</td></tr>
       <tr><td><strong>Billing account</strong></td><td>❌ No</td><td>You enter a payment method in the Console. Free trial credit attaches here.</td></tr>
-      <tr><td>Project</td><td>✅ Yes</td><td><code>google_project</code> — handled by <code>envs/bootstrap</code>.</td></tr>
+      <tr><td>Project</td><td>✅ Yes</td><td><code>google_project</code> — handled by <code>envs/bootstrap</code>. Created under <em>no organization</em>, billed directly to your billing account.</td></tr>
       <tr><td>API enablement</td><td>✅ Yes</td><td><code>google_project_service</code> — handled by <code>envs/bootstrap</code>.</td></tr>
-      <tr><td><code>environment</code> tag + binding</td><td>✅ Yes</td><td><code>google_tags_tag_*</code> — handled by <code>envs/bootstrap</code>.</td></tr>
       <tr><td>Cluster, IAM, networking, everything else</td><td>✅ Yes</td><td><code>envs/dev</code> takes over from here.</td></tr>
     </tbody>
   </table>
 
+  <div class="callout note">
+    <p><strong>Why no GCP Organization?</strong> An Org is only required if you want org-level features (org-level IAM policies, shared VPCs, organization tags, etc.). For a single-developer capstone, all of that is overkill — and provisioning one requires Cloud Identity / Workspace setup for a domain you own, which adds 30–60 minutes of manual setup with its own failure modes (auto-orgs going into <code>DELETE_REQUESTED</code>, IAM grant chasing, etc.). Skipping the org keeps things simple. See the appendix at the bottom of this section if you want to go down that path anyway.</p>
+  </div>
+
   <h3>7.1 — Claim the free trial credit</h3>
   <p>If you don't already have a billing account: sign up at <a href="https://cloud.google.com/free">cloud.google.com/free</a> and claim the $300 / 90-day trial. The trial creates a billing account; we'll create the project itself with Terraform in step 10.</p>
 
-  <h3>7.2 — Set up Cloud Identity Free (gives you the GCP Organization)</h3>
-  <p>Cloud Identity Free is HashiCorp-style: free forever, identity-only (no email), up to 50 users. It's the standard way to provision a GCP Org for personal projects.</p>
+  <h3>7.2 — Install and authenticate gcloud</h3>
+<pre><code># Windows
+winget install Google.CloudSDK
 
-  <ol>
-    <li>Open <a href="https://workspace.google.com/business/signup/welcome?sku=identitybasic">workspace.google.com/.../sku=identitybasic</a>. The URL must include <code>sku=identitybasic</code> — that selects the free SKU.</li>
-    <li>Business info: any name (e.g. "ProdX"). Country: yours.</li>
-    <li>Domain: <code>pbcv.dev</code> (or your domain).</li>
-    <li>Create the admin user — username like <code>admin</code> at your domain (so <code>admin@pbcv.dev</code>). The mailbox won't actually receive mail; Cloud Identity is identity-only.</li>
-    <li>Sign in to <a href="https://admin.google.com">admin.google.com</a> with the new admin account.</li>
-    <li>Domain verification: Google gives you a TXT record. Add it in Cloudflare → DNS → Records (type <code>TXT</code>, name <code>@</code>, content <code>google-site-verification=...</code>), then click <strong>Verify</strong> in admin.google.com. Verification usually completes within a minute.</li>
-  </ol>
+# WSL / Linux
+sudo snap install google-cloud-cli --classic
 
-  <h3>7.3 — Move the billing account into the new org</h3>
-  <p>Your trial billing account was created when you had no org, so it currently lives outside any org. Terraform can use external billing accounts, but the cleanest setup is to move it in:</p>
-
-  <ol>
-    <li>Sign in to <a href="https://console.cloud.google.com/billing">console.cloud.google.com/billing</a> as your <em>original</em> account (the one that created the billing account).</li>
-    <li>Click the billing account → <strong>Account management</strong> → <strong>Change organization</strong>.</li>
-    <li>Pick your new org (your domain name will appear).</li>
-    <li>Confirm.</li>
-  </ol>
-
-  <h3>7.4 — Install gcloud, sign in as the org admin, capture the IDs</h3>
-<pre><code>winget install Google.CloudSDK
-gcloud auth login                          # use your new admin@pbcv.dev account
-gcloud auth application-default login
-
-gcloud organizations list                  # copy the ID column → this is org_id
-gcloud billing accounts list               # copy the ACCOUNT_ID column → this is billing_account</code></pre>
-
-  <p>Save those two values somewhere — they go into <code>envs/bootstrap/terraform.tfvars</code> in step 10.</p>
+# Either way
+gcloud auth login
+gcloud auth application-default login</code></pre>
 
   <div class="callout ok">
     <p><strong>Why both <code>auth</code> commands?</strong></p>
@@ -619,8 +600,19 @@ gcloud billing accounts list               # copy the ACCOUNT_ID column → this
       <li><code>gcloud auth login</code> — credentials for the <code>gcloud</code> CLI itself (kubectl, project switches, etc.).</li>
       <li><code>gcloud auth application-default login</code> — credentials Terraform's google provider picks up automatically.</li>
     </ul>
-    <p>Both have to be the org-admin account for the bootstrap apply to be allowed to create projects.</p>
   </div>
+
+  <h3>7.3 — Capture your billing account ID</h3>
+<pre><code>gcloud billing accounts list</code></pre>
+
+  <p>Copy the <code>ACCOUNT_ID</code> column (format <code>XXXXXX-XXXXXX-XXXXXX</code>) of the row marked <code>OPEN: True</code>. You'll paste this into <code>envs/bootstrap/terraform.tfvars</code> in step 10.</p>
+
+  <div class="callout warn">
+    <p><strong>The "environment tag" warning.</strong> After step 10 creates your project, <code>gcloud config set project</code> will print a warning that the project lacks an <code>environment</code> tag. <strong>Ignore it.</strong> That warning is benign — environment tags are org-scoped, and parentless projects (which is what we create) literally cannot have one bound. There is no action you can take to silence it short of moving to an org-based setup.</p>
+  </div>
+
+  <h3>Appendix — full org-based IaC (optional, ~60+ extra minutes)</h3>
+  <p>If you want the full IaC story with an environment tag bound by Terraform: set up <a href="https://workspace.google.com/business/signup/welcome?sku=identitybasic">Cloud Identity Free</a> for a domain you own, verify the domain via DNS TXT, capture <code>gcloud organizations list</code>'s ID, then grant yourself <code>roles/resourcemanager.projectCreator</code> + <code>roles/resourcemanager.tagAdmin</code> + <code>roles/billing.user</code> via <code>gcloud organizations add-iam-policy-binding</code> on the org. Then put <code>org_id</code> back in the bootstrap module and re-add the <code>google_tags_tag_key</code>/<code>value</code>/<code>binding</code> resources. None of this is required for the cluster work that follows.</p>
 </section>
 
 <section id="hcp">
@@ -638,7 +630,10 @@ gcloud billing accounts list               # copy the ACCOUNT_ID column → this
       </ul>
       For each: type <strong>CLI-driven workflow</strong> (not VCS, not API).
     </li>
-    <li>For <em>each</em> workspace: open it → <strong>Settings → General → Execution Mode → Local</strong>. Save.
+    <li>For <em>each</em> workspace: open it → <strong>Settings → General → Execution Mode → Local</strong> → <strong>Save settings</strong>.
+      <div class="callout danger">
+        <p><strong>Most-missed step.</strong> New workspaces default to <strong>Remote</strong> execution mode even when created as CLI-driven. If you skip the dropdown change, <code>terraform plan</code> errors with <em>"could not find default credentials"</em> because HCP's runners try to use ADC — which only exists on your laptop. The fix is always: change Execution Mode to Local in this exact settings page, then re-run.</p>
+      </div>
       <div class="callout note">
         <p><strong>Why local execution?</strong> Remote execution requires uploading GCP + Cloudflare credentials to HCP Terraform. Local execution runs <code>terraform apply</code> on your machine using your <code>gcloud</code> ADC and your <code>terraform.tfvars</code>; only the state file lives in HCP. Simpler to start with — we can switch to remote execution + workload identity federation later.</p>
       </div>
@@ -705,33 +700,59 @@ cloud {
 <section id="bootstrap">
   <h2><span class="step">10</span>terraform apply: bootstrap</h2>
 
-  <p>This is the one-time apply that creates the GCP project, enables APIs on it, creates the org-level <code>environment</code> tag (with all four standard values), and binds <code>Development</code> to the new project. State goes to the <code>prodx-bootstrap</code> HCP Terraform workspace.</p>
+  <p>The one-time apply that creates the GCP project under no organization and enables the 5 APIs we need on it. State goes to the <code>prodx-bootstrap</code> HCP Terraform workspace. 6 resources total, ~3 minutes (project creation is the slow part).</p>
 
   <h3>Fill in the tfvars</h3>
-<pre><code>cd ProdXTF\envs\bootstrap
-copy terraform.tfvars.example terraform.tfvars
-notepad terraform.tfvars</code></pre>
+<pre><code>cd ProdXTF/envs/bootstrap
+cp terraform.tfvars.example terraform.tfvars
+$EDITOR terraform.tfvars         # or notepad / nano / vim</code></pre>
 
-  <p>The two required values are the IDs you captured in step 7.4:</p>
-<pre><code>org_id          = "123456789012"
-billing_account = "XXXXXX-XXXXXX-XXXXXX"
-# project_id      = "prodx-dev"          # default; must be globally unique
-# project_name    = "ProdX Dev"
-# environment_value = "Development"</code></pre>
+  <p>One required value — the billing account ID from step 7.3:</p>
+<pre><code>billing_account = "XXXXXX-XXXXXX-XXXXXX"
+# project_id   = "prodx-dev"     # default; must be globally unique across all of GCP
+# project_name = "ProdX Dev"</code></pre>
+
+  <h3>Pre-flight: clear any stale quota project from ADC</h3>
+  <p>If you've used gcloud with a previous project, your ADC may have a <code>quota_project_id</code> pinned that points to a project you've since deleted. When TF tries to bill API calls to that ghost project, every call fails with "project not found". Clear it before <code>init</code>:</p>
+<pre><code># Check first — prints '1' if set, '0' if not
+grep -c quota_project_id ~/.config/gcloud/application_default_credentials.json
+
+# If it printed '1', remove the field:
+sudo apt install -y jq    # if jq isn't installed (Linux/WSL)
+jq 'del(.quota_project_id)' ~/.config/gcloud/application_default_credentials.json \
+  &gt; /tmp/adc.json &amp;&amp; mv /tmp/adc.json ~/.config/gcloud/application_default_credentials.json</code></pre>
+
+  <div class="callout note">
+    <p>Safe: <code>jq 'del(.quota_project_id)'</code> only removes that one field. Refresh token and account info are untouched. We'll re-pin the quota project to the new <code>prodx-dev</code> right after apply succeeds.</p>
+  </div>
 
   <h3>Apply</h3>
 <pre><code>terraform init
 terraform apply</code></pre>
 
-  <p>Takes ~60–90 seconds. Outputs include the new <code>project_id</code> — you'll paste this into the dev tfvars next.</p>
+  <p>Takes ~3 minutes (project creation is the slow part; API enablement is seconds each, run in parallel). Outputs include the new <code>project_id</code> and <code>project_number</code>.</p>
 
-  <h3>Pin gcloud to the new project</h3>
-  <p>Now that the project exists, point gcloud at it (and pin ADC's quota project so you don't get the warning):</p>
-<pre><code>gcloud config set project (terraform output -raw project_id)
+  <div class="callout warn">
+    <p><strong>Common first-apply failures:</strong></p>
+    <ul>
+      <li><strong>"could not find default credentials"</strong> — the HCP workspace is still on Remote execution. Go back to step 8 and switch Execution Mode to Local.</li>
+      <li><strong>"project not found" on every call</strong> — ADC's <code>quota_project_id</code> is pinned to a deleted project. Run the <code>jq del</code> command above.</li>
+      <li><strong>"Permission 'resourcemanager.projects.create' denied"</strong> — your gcloud account is associated with a GCP Organization (Workspace, Cloud Identity, or company tenant) that requires projects to be created under it, and you don't have <code>projectCreator</code> on that org. Quick test: <code>gcloud projects create test-$(date +%s)</code> — if that fails too, the issue is account-level, not Terraform. See the appendix at the end of step 7.</li>
+    </ul>
+  </div>
+
+  <h3>Pin gcloud + ADC to the new project</h3>
+  <p>Now that the project exists, point gcloud at it (and pin ADC's quota project so no quota warnings):</p>
+<pre><code># bash / WSL
+gcloud config set project $(terraform output -raw project_id)
+gcloud auth application-default set-quota-project $(terraform output -raw project_id)
+
+# PowerShell
+gcloud config set project (terraform output -raw project_id)
 gcloud auth application-default set-quota-project (terraform output -raw project_id)</code></pre>
 
-  <div class="callout ok">
-    <p>You should see no warnings on the <code>gcloud config set project</code> call this time — the <code>environment</code> tag is already bound by Terraform.</p>
+  <div class="callout warn">
+    <p>gcloud will still print the <code>environment</code> tag warning. <strong>Ignore it</strong> — see step 7.3 for why. It's purely cosmetic on parentless projects.</p>
   </div>
 </section>
 
@@ -872,7 +893,6 @@ terraform destroy</code></pre>
     <ul>
       <li>Container images on Docker Hub (delete in the Docker Hub UI if you want).</li>
       <li>Your HCP Terraform workspaces (delete in each workspace's Settings → Destruction and Deletion).</li>
-      <li>Cloud Identity / your GCP Organization (leave it — it's free and reusable).</li>
       <li>The Cloudflare zone (it's your domain — leave it).</li>
     </ul>
   </div>
@@ -881,15 +901,20 @@ terraform destroy</code></pre>
 <section id="troubleshooting">
   <h2><span class="step">15</span>Troubleshooting</h2>
 
-  <h3>Cloud Identity domain verification "couldn't find the record"</h3>
-  <p>DNS propagation between Cloudflare and Google's verifier can lag a few minutes. The TXT record name must be the apex (<code>@</code>, which displays as <code>pbcv.dev</code> in CF). Also make sure the Cloudflare record's <strong>proxy status is "DNS only"</strong> (grey cloud) — Cloudflare doesn't proxy TXT records, but the toggle should be grey. Try Verify again after 60 seconds.</p>
+  <h3>HCP Terraform plan errors with "could not find default credentials"</h3>
+  <p>The workspace is still on Remote execution mode. HCP's runners don't have your local <code>gcloud</code> ADC, so calls error out. Open the workspace → Settings → General → Execution Mode → <strong>Local</strong> → Save settings, then re-run <code>terraform plan</code>. New workspaces default to Remote even when created as CLI-driven.</p>
 
-  <h3>Bootstrap apply fails: <code>Error 403: The caller does not have permission</code></h3>
-  <p>You're authenticated as the wrong account. <code>gcloud auth list</code> must show your <code>admin@pbcv.dev</code> Cloud Identity user as <strong>ACTIVE</strong>, not your original Gmail. Switch with <code>gcloud config set account admin@pbcv.dev</code> and re-run both <code>gcloud auth login</code> + <code>gcloud auth application-default login</code> if needed.</p>
+  <h3>Bootstrap apply fails: every API call says "project not found"</h3>
+  <p>Your ADC's <code>quota_project_id</code> is pinned to a deleted project. Check with <code>grep -c quota_project_id ~/.config/gcloud/application_default_credentials.json</code> — if it prints <code>1</code>, clear the field (see step 10 pre-flight). New gcloud versions auto-pin quota project to whatever was active during <code>application-default login</code>; if that project later got deleted, every TF call breaks.</p>
 
-  <h3>Bootstrap apply fails: <code>billing_account ... is not accessible</code></h3>
-  <p>The billing account hasn't been moved into the org yet, or your admin user doesn't have Billing Admin on it. Check Console → Billing → Account management → Organization, and IAM on the billing account itself.</p>
+  <h3>Bootstrap apply fails: <code>Permission 'resourcemanager.projects.create' denied</code></h3>
+  <p>Your Gmail/Workspace account is associated with a GCP Organization (visible via <code>gcloud organizations list</code>) and that org requires projects to be created under it. Quick test: <code>gcloud projects create test-$(date +%s)</code>. If that also fails, it's an account-level constraint, not a Terraform bug. Options: (a) get <code>roles/resourcemanager.projectCreator</code> on the org, (b) switch to a Gmail account that isn't org-bound, or (c) follow the org-based variant in step 7's appendix.</p>
 
+  <h3>Bootstrap apply fails: <code>LifecycleState for parent organizations/... is DELETE_REQUESTED</code></h3>
+  <p>An org you're associated with is being torn down by Google (usually because a Cloud Identity / Workspace subscription was cancelled). Run <code>gcloud organizations describe &lt;ORG_ID&gt;</code> to confirm. There's no quick fix from gcloud — either restore the subscription via <a href="https://admin.google.com">admin.google.com</a> within the grace period, or sign in with a different Gmail account that isn't bound to that dying org and re-run <code>gcloud auth login</code> + <code>gcloud auth application-default login</code>.</p>
+
+  <h3><code>gcloud config set project</code> warns about a missing "environment" tag</h3>
+  <p>Harmless. Environment tags are org-scoped and parentless projects (which the default no-org bootstrap creates) literally cannot have one bound. There is no action you can take to silence it short of moving to the org-based variant — and it doesn't block anything.</p>
 
   <h3>CI build fails with <code>denied: requested access to the resource is denied</code></h3>
   <p>Docker Hub token has the wrong scope, or the secret names in GitHub are wrong. Re-create the token with Read+Write+Delete and double-check the secrets are spelled <code>DOCKERHUB_USERNAME</code> and <code>DOCKERHUB_TOKEN</code> exactly.</p>
