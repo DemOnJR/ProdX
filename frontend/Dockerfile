@@ -17,6 +17,13 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 
+# Pick up the latest alpine package patches at build time. nginx:1.27-alpine
+# tracks the alpine 3.21 release, which gets security backports faster than
+# the nginx maintainers rebuild the image — without this `apk upgrade`,
+# Trivy finds CRITICAL openssl/libxml2 CVEs that already have fixed alpine
+# packages available.
+RUN apk upgrade --no-cache && rm -rf /var/cache/apk/*
+
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
