@@ -46,16 +46,38 @@ header.hero {
   border-bottom: 1px solid var(--border);
   text-align: center;
 }
+header.hero .eyebrow {
+  display: inline-block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent-2);
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  border-radius: 999px;
+  padding: 4px 14px;
+  margin-bottom: 16px;
+}
 header.hero h1 {
   margin: 0 0 8px;
-  font-size: 44px;
+  font-size: 56px;
   letter-spacing: -0.5px;
   background: linear-gradient(90deg, #c4b5fd, #67e8f9);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
-header.hero p { margin: 0; color: var(--muted); font-size: 17px; }
+header.hero .tagline { margin: 0 auto; color: var(--muted); font-size: 18px; max-width: 720px; }
+header.hero .author {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--faint);
+  display: inline-flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+header.hero .author strong { color: var(--text); }
 header.hero .meta {
   margin-top: 14px;
   font-size: 13px;
@@ -64,6 +86,50 @@ header.hero .meta {
   gap: 18px;
   flex-wrap: wrap;
   justify-content: center;
+}
+
+.live-demo {
+  max-width: 900px;
+  margin: 32px auto 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.live-demo a {
+  display: block;
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: left;
+  text-decoration: none;
+  transition: transform .15s, border-color .15s;
+}
+.live-demo a:hover {
+  text-decoration: none;
+  border-color: var(--accent-2);
+  transform: translateY(-2px);
+}
+.live-demo .lbl {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--faint);
+  margin-bottom: 4px;
+}
+.live-demo .url {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 600;
+}
+.live-demo .desc {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 .layout {
@@ -316,35 +382,61 @@ footer {
 <body>
 
 <header class="hero">
+  <span class="eyebrow">ITSchool DevOps · Final Project Presentation</span>
   <h1>ProdX</h1>
-  <p>An ITSchool DevOps capstone — full setup tutorial, zero to live</p>
+  <p class="tagline">A small full-stack app shipped through a complete DevOps pipeline: GitHub → CI → Docker Hub → Terraform-provisioned GKE → Argo CD → Cloudflare Tunnel → live URL — all reproducible by anyone with their own GCP, Docker Hub, and Cloudflare accounts.</p>
+
+  <div class="author">
+    <span>Presented by <strong>Pipiașa Bogdan</strong></span>
+    <span>·</span>
+    <span>ITSchool DevOps Course · 2026</span>
+  </div>
+
   <div class="meta">
     <span>FastAPI · React + React Flow · PostgreSQL · Redis</span>
     <span>GKE · Argo CD · Cloudflare Tunnel</span>
     <span>Terraform · HCP Terraform · GitHub Actions · Docker Hub</span>
   </div>
+
+  <div class="live-demo">
+    <a href="https://prodx.pbcv.dev" target="_blank" rel="noopener">
+      <span class="lbl">App</span>
+      <span class="url">prodx.pbcv.dev</span>
+      <span class="desc">React Flow canvas rendered from Postgres</span>
+    </a>
+    <a href="https://prodxapi.pbcv.dev/api/metrics" target="_blank" rel="noopener">
+      <span class="lbl">API</span>
+      <span class="url">prodxapi.pbcv.dev</span>
+      <span class="desc">FastAPI: /health, /api/metrics, /api/graphs</span>
+    </a>
+    <a href="https://argocd.pbcv.dev" target="_blank" rel="noopener">
+      <span class="lbl">Argo CD</span>
+      <span class="url">argocd.pbcv.dev</span>
+      <span class="desc">GitOps reconciler UI (admin login)</span>
+    </a>
+  </div>
 </header>
 
 <div class="layout">
   <aside class="toc">
-    <h2>Tutorial</h2>
+    <h2>Contents</h2>
     <nav>
       <ol>
-        <li><a href="#overview">1. Overview</a></li>
+        <li><a href="#overview">1. Project summary</a></li>
         <li><a href="#architecture">2. Architecture</a></li>
         <li><a href="#prereqs">3. Prerequisites</a></li>
-        <li><a href="#clone">4. Clone the repos</a></li>
-        <li><a href="#local">5. Run ProdX locally</a></li>
-        <li><a href="#ci">6. Docker Hub + GitHub CI</a></li>
-        <li><a href="#identity">7. Cloud Identity + GCP setup</a></li>
-        <li><a href="#hcp">8. HCP Terraform setup</a></li>
-        <li><a href="#cloudflare">9. Cloudflare setup</a></li>
-        <li><a href="#bootstrap">10. terraform apply: bootstrap</a></li>
-        <li><a href="#apply">11. terraform apply: dev</a></li>
-        <li><a href="#verify">12. Verify it works</a></li>
-        <li><a href="#prodxcd">13. ProdXCD + Argo App</a></li>
+        <li><a href="#clone">4. The three repos</a></li>
+        <li><a href="#local">5. Local stack (Docker Compose)</a></li>
+        <li><a href="#ci">6. CI: GitHub Actions → Docker Hub</a></li>
+        <li><a href="#identity">7. GCP setup</a></li>
+        <li><a href="#hcp">8. HCP Terraform</a></li>
+        <li><a href="#cloudflare">9. Cloudflare tunnel</a></li>
+        <li><a href="#bootstrap">10. Bootstrap apply (project)</a></li>
+        <li><a href="#apply">11. Dev apply (cluster)</a></li>
+        <li><a href="#verify">12. Verification</a></li>
+        <li><a href="#prodxcd">13. ProdXCD + root Argo Application</a></li>
         <li><a href="#teardown">14. Teardown</a></li>
-        <li><a href="#commands">15. Quick reference</a></li>
+        <li><a href="#commands">15. Reproducing this (your own accounts)</a></li>
         <li><a href="#troubleshooting">16. Troubleshooting</a></li>
       </ol>
     </nav>
@@ -353,11 +445,17 @@ footer {
 <main>
 
 <section id="overview">
-  <h2><span class="step">01</span>Overview</h2>
+  <h2><span class="step">01</span>Project summary</h2>
+
+  <div class="callout note">
+    <p><strong>About this document.</strong> This is the presentation for the project, not a personal tutorial. The live URLs in the header are the deployed instance using my domain (<code>pbcv.dev</code>), GCP project (<code>prodx-dev</code>), Docker Hub namespace (<code>pbdaemon</code>), and GitHub user (<code>DemOnJR</code>) — concrete values shown as a worked example. Anyone reproducing the project substitutes their own equivalents (see <a href="#commands">section 15</a>). The Git repositories, Terraform code, Helm chart, CI workflow, and tutorial HTML are public and self-contained.</p>
+  </div>
+
   <p>
-    ProdX is a small full-stack web app (FastAPI + React) packaged with a complete DevOps pipeline around it.
-    The point of the project isn't the app — it's the path the app takes to get into production:
-    code → CI → container registry → Terraform-provisioned cluster → GitOps reconciler → publicly reachable URL.
+    ProdX is a small full-stack web app (FastAPI backend, React frontend) wrapped in a complete DevOps pipeline.
+    The point isn't the app itself — it's the path the app takes from a developer's machine to a publicly-reachable URL:
+    <strong>source → CI build → container registry → Terraform-provisioned GKE cluster → GitOps reconciler → Cloudflare Tunnel → live</strong>.
+    Every layer is infrastructure-as-code where possible; the few manual steps that exist (claiming a GCP free trial, clicking through Cloudflare Tunnel setup) are documented and bounded.
   </p>
 
   <p>The work is split across three GitHub repositories so the boundaries between
@@ -735,6 +833,65 @@ cloud {
     name = "prodx-dev"
   }
 }</code></pre>
+
+  <h3>Can Terraform run in the cloud instead of on my laptop?</h3>
+
+  <p><strong>Yes.</strong> HCP Terraform supports three execution modes; the project ships with the simplest one but switching is one dropdown + uploading credentials.</p>
+
+  <table>
+    <thead><tr><th>Mode</th><th>Where TF runs</th><th>What HCP needs from you</th><th>Trigger</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Local</strong> <em>(default in this project)</em></td>
+        <td>Your laptop</td>
+        <td>Nothing — local <code>gcloud</code> ADC is used</td>
+        <td>You run <code>terraform apply</code></td>
+      </tr>
+      <tr>
+        <td><strong>Remote, CLI-driven</strong></td>
+        <td>HCP-hosted Linux runner</td>
+        <td>GCP credentials (service account JSON or OIDC), Cloudflare-related env vars if any</td>
+        <td>You run <code>terraform apply</code> — it streams from HCP to your terminal</td>
+      </tr>
+      <tr>
+        <td><strong>Remote, VCS-driven</strong></td>
+        <td>HCP-hosted Linux runner</td>
+        <td>Same credentials + a connection to GitHub/GitLab/Bitbucket</td>
+        <td>Git push triggers <code>plan</code> on PRs and <code>apply</code> on merges to <code>main</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h4>Switching this project to Remote execution</h4>
+
+  <ol>
+    <li>HCP Terraform → workspace <code>prodx-dev</code> → Settings → General → <strong>Execution Mode = Remote</strong> → Save.</li>
+    <li>Workspace → Variables → Add a variable:
+      <ul>
+        <li><strong>Key:</strong> <code>GOOGLE_CREDENTIALS</code></li>
+        <li><strong>Value:</strong> the JSON contents of a GCP service account key (download from Console → IAM → Service Accounts → Keys → Add Key → JSON). The SA needs <code>roles/owner</code> on the <code>prodx-dev</code> project, or a more minimal set covering <code>compute.*</code> + <code>container.*</code> + <code>iam.*</code>.</li>
+        <li><strong>Category:</strong> Environment variable</li>
+        <li><strong>Sensitive:</strong> ✅ checked (encrypted at rest, never shown again)</li>
+      </ul>
+    </li>
+    <li>Run <code>terraform apply</code> as before — output now comes from HCP's runners. State stays where it already was.</li>
+  </ol>
+
+  <p><strong>Hardened variant: GCP Workload Identity Federation</strong> — instead of a static SA key, HCP exchanges a short-lived OIDC token for a temporary GCP credential. No static secret to rotate or leak. HashiCorp has a <a href="https://developer.hashicorp.com/terraform/cloud-docs/workspaces/dynamic-provider-credentials/gcp-configuration">step-by-step guide</a>; the setup is a one-time 15-minute extra but eliminates the SA-key lifecycle entirely.</p>
+
+  <p><strong>What you trade for it:</strong></p>
+  <ul>
+    <li>✅ No GCP credentials on your laptop (or any laptop)</li>
+    <li>✅ Audit log of every run (who, when, what changed)</li>
+    <li>✅ With VCS-driven mode: <code>git push</code> = automated apply, no human in the loop</li>
+    <li>⚠️ Each plan/apply waits for a runner to start (~10–30s cold start)</li>
+    <li>⚠️ Secrets you previously kept local (CF token) live in HCP now — you trust HCP, not just your laptop</li>
+    <li>⚠️ Iterating on TF code is slower (no instant feedback from local <code>plan</code>)</li>
+  </ul>
+
+  <div class="callout note">
+    <p><strong>Why this project ships with Local execution.</strong> The capstone scope is one student building the pipeline end-to-end; the credential upload + the slower iteration loop add friction without value at that scale. Remote execution becomes the right answer once more than one person needs to apply, or once you want CI to do it automatically on Git push.</p>
+  </div>
 </section>
 
 <section id="cloudflare">
@@ -1091,9 +1248,24 @@ terraform destroy</code></pre>
 </section>
 
 <section id="commands">
-  <h2><span class="step">15</span>Quick reference: every command, in order</h2>
+  <h2><span class="step">15</span>Reproducing this with your own accounts</h2>
 
-  <p>Distilled copy-paste-friendly recipe — only the commands a fresh follower needs. No debugging detours. Assumes WSL/Linux shell; PowerShell variants noted where they differ.</p>
+  <p>Everything in this project is designed to be re-runnable by anyone with their own GCP, Docker Hub, Cloudflare, and HCP Terraform accounts. This section is the fast path: every shell command in execution order, no narrative. ~25 minutes of active work + ~15 minutes of waiting for GKE.</p>
+
+  <div class="callout warn">
+    <p><strong>Values you'll need to substitute</strong> — the commands and config files use my values as concrete examples. Replace them with your own:</p>
+    <table style="margin: 8px 0 0">
+      <thead><tr><th>Placeholder</th><th>Example (mine)</th><th>What it is</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;YOUR-GH-USER&gt;</code></td><td><code>DemOnJR</code></td><td>GitHub account/org owning the three repos (fork or recreate them)</td></tr>
+        <tr><td><code>&lt;YOUR-DOCKERHUB-USER&gt;</code></td><td><code>pbdaemon</code></td><td>Docker Hub namespace; appears in <code>.github/workflows/docker-publish.yml</code> and <code>ProdXCD/charts/prodx/values.yaml</code></td></tr>
+        <tr><td><code>&lt;YOUR-DOMAIN&gt;</code></td><td><code>pbcv.dev</code></td><td>Cloudflare-managed zone; appears in <code>cors_origins</code> in <code>ProdXCD/charts/prodx/values.yaml</code> and as the parent of the three subdomains</td></tr>
+        <tr><td><code>&lt;YOUR-TFC-ORG&gt;</code></td><td><code>PBDaemon</code></td><td>HCP Terraform organization name; appears in both <code>versions.tf</code> files</td></tr>
+        <tr><td><code>&lt;YOUR-BILLING&gt;</code></td><td><code>0146A8-513D23-B9E74D</code></td><td>GCP billing account ID; appears in <code>envs/bootstrap/terraform.tfvars</code></td></tr>
+        <tr><td><code>&lt;YOUR-PROJECT-ID&gt;</code></td><td><code>prodx-dev</code></td><td>GCP project ID that bootstrap creates (defaults to <code>prodx-dev</code>, must be globally unique)</td></tr>
+      </tbody>
+    </table>
+  </div>
 
   <h3>15.1 — Install the CLIs (one-time per machine)</h3>
 <pre><code># WSL / Linux
