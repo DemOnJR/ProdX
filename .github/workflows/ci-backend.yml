@@ -142,12 +142,15 @@ jobs:
 
       # Required for kubectl to authenticate to GKE clusters since GKE 1.26
       # (Google moved auth out of gcloud into a separate plugin). The runner's
-      # preinstalled gcloud doesn't ship with it. Apt path is faster than
-      # re-running setup-gcloud (~5s vs ~15s) and leverages the Google Cloud
-      # SDK repo that's already configured on the runner.
+      # preinstalled gcloud is snap-installed on ubuntu-24.04 so the Google
+      # Cloud apt repo isn't configured and `apt install` can't find the
+      # package. setup-gcloud installs its own gcloud + the component reliably
+      # across runner images (~10-15s).
       - name: 🛠️ Install gke-gcloud-auth-plugin
         if: github.event_name != 'pull_request'
-        run: sudo apt-get install -y google-cloud-cli-gke-gcloud-auth-plugin
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          install_components: gke-gcloud-auth-plugin
 
       - name: 🚢 Tag local image + push each tag to GAR
         if: github.event_name != 'pull_request'

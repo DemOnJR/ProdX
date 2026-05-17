@@ -122,7 +122,9 @@ jobs:
       # Required for kubectl to authenticate to GKE clusters. See ci-backend.yml.
       - name: 🛠️ Install gke-gcloud-auth-plugin
         if: github.event_name != 'pull_request'
-        run: sudo apt-get install -y google-cloud-cli-gke-gcloud-auth-plugin
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          install_components: gke-gcloud-auth-plugin
 
       - name: 🚢 Tag local image + push each tag to GAR
         if: github.event_name != 'pull_request'
