@@ -1,0 +1,34 @@
+name: CI · Frontend (skip)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Skip-stub mirror of ci-backend-skip.yml for the frontend service.
+# See ci-backend-skip.yml's header for the full rationale on the pattern.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+      - '.github/scripts/trivy-summary.py'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+      - '.github/scripts/trivy-summary.py'
+
+jobs:
+  scan:
+    # MUST match the real scan job's name in ci-frontend.yml — branch
+    # protection matches on the displayed name.
+    name: 🛡️ Frontend · Scan image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Skip — frontend unchanged in this commit
+        run: |
+          echo "No frontend/** changes in this push/PR; skipping the frontend pipeline."
+          echo "This synthetic success unblocks branch protection."

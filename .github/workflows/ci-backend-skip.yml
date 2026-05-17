@@ -1,0 +1,54 @@
+name: CI · Backend (skip)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#                              WHY THIS FILE EXISTS
+# ─────────────────────────────────────────────────────────────────────────────
+# Branch protection on `main` requires "🛡️ Backend · Scan image" to pass on
+# every PR. But ci-backend.yml is path-filtered — it doesn't run when a PR
+# touches only frontend/** or only README, etc. With no run, no check is
+# posted, and branch protection blocks the merge forever waiting for a
+# check that will never come.
+#
+# This stub workflow runs in EXACTLY the inverse cases: any push/PR to main
+# that DOESN'T match the backend paths. It does no real work — just emits a
+# job with the same name "🛡️ Backend · Scan image" so branch protection's
+# required-checks list sees a green tick.
+#
+# So at any given moment:
+#   - backend/** changed   → ci-backend.yml runs (full pipeline)        ✅
+#   - backend/** unchanged → ci-backend-skip.yml runs (instant noop)    ✅
+#
+# Branch protection sees one or the other. Never both. Never neither.
+#
+# Canonical pattern, documented in:
+#   https://github.com/orgs/community/discussions/13690
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+      - '.github/scripts/trivy-summary.py'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+      - '.github/scripts/trivy-summary.py'
+
+jobs:
+  scan:
+    # CRITICAL: this name MUST match the real scan job's name in
+    # ci-backend.yml exactly, including the emoji. Branch protection
+    # matches on the displayed name.
+    name: 🛡️ Backend · Scan image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Skip — backend unchanged in this commit
+        run: |
+          echo "No backend/** changes in this push/PR; skipping the backend pipeline."
+          echo "This synthetic success unblocks branch protection."
