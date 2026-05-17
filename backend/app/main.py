@@ -8,7 +8,6 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
-from sqlalchemy.orm import Session as OrmSession
 
 from app.cache import (
     get_client,
@@ -35,7 +34,7 @@ def seed(settings: Settings) -> None:
     """
     force = os.getenv("FORCE_SEED", "false").lower() in ("true", "1", "yes")
     engine = get_engine()
-    with OrmSession(bind=engine) as db:
+    with Session(bind=engine) as db:
         existing = db.get(Graph, GRAPH_ID)
         if existing is None:
             db.add(Graph(id=GRAPH_ID, payload=PRODX_GRAPH))
