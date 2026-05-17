@@ -59,7 +59,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=backend
 
       - name: Trivy scan (CRITICAL, fixed-only — fails build)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.API_IMAGE }}:ci-scan
           severity: CRITICAL
@@ -130,17 +130,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          # No `cache: 'npm'` because we don't commit package-lock.json — the
+          # setup-node cache requires a lockfile. Generating + committing one
+          # would let us turn this back on (and use `npm ci`).
 
       - name: Install dependencies
         working-directory: ./frontend
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install --no-audit --no-fund
-          fi
+        run: npm install --no-audit --no-fund
 
       - name: TypeScript check (tsc --noEmit)
         working-directory: ./frontend
@@ -164,7 +160,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend
 
       - name: Trivy scan (CRITICAL, fixed-only — fails build)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.WEB_IMAGE }}:ci-scan
           severity: CRITICAL
