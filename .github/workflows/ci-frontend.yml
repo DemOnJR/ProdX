@@ -142,21 +142,9 @@ jobs:
 
       - name: npm audit (CRITICAL threshold)
         id: audit
-        # JSON output to a file for the artifact + a human-readable run.
         # --audit-level=critical: fail only on CRITICAL advisories (matches
         # the Trivy image scan threshold; raise to 'high' for stricter).
-        run: |
-          npm audit --json > audit.json || true
-          npm audit --audit-level=critical
-
-      - name: Upload audit report
-        if: always() && steps.audit.outcome != 'skipped'
-        uses: actions/upload-artifact@v7
-        with:
-          name: frontend-deps-audit
-          path: frontend/audit.json
-          retention-days: 14
-          if-no-files-found: warn
+        run: npm audit --audit-level=critical
 
       - name: Summary
         if: always()

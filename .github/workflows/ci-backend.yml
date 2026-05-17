@@ -163,22 +163,8 @@ jobs:
 
       - name: pip-audit (runtime deps, full transitive tree)
         id: audit
-        # Two runs: first writes JSON to a file for the artifact (|| true so
-        # the human-readable run still happens even on findings); second is
-        # the actual gate that fails the build on any known CVE in the
-        # requirements + their transitive deps.
-        run: |
-          pip-audit -r requirements.txt --format json --output audit.json || true
-          pip-audit -r requirements.txt
-
-      - name: Upload audit report
-        if: always() && steps.audit.outcome != 'skipped'
-        uses: actions/upload-artifact@v7
-        with:
-          name: backend-deps-audit
-          path: backend/audit.json
-          retention-days: 14
-          if-no-files-found: warn
+        # Fails the build on any known CVE in requirements + transitive deps.
+        run: pip-audit -r requirements.txt
 
       - name: Summary
         if: always()
