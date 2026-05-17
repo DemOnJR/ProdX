@@ -10,8 +10,8 @@ name: CI · Backend
 #     ~2 minutes of "wasted" CI on a frontend-only PR is the price of
 #     not needing a separate skip-stub workflow file.
 #
-# Branch protection: job name "🛡️ Backend · Scan image" matches the
-# required-checks rule on `main`.
+# Branch protection: job name "🚀 Pipeline" — if you have a required-checks
+# rule pinned to the old "🛡️ Backend · Scan image" name, update it.
 
 on:
   push:
@@ -38,7 +38,7 @@ env:
 
 jobs:
   ci:
-    name: 🛡️ Backend · Scan image
+    name: 🚀 Pipeline
     runs-on: ubuntu-latest
     permissions:
       contents: read
