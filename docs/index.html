@@ -816,11 +816,82 @@ git push</code></pre>
     directory: "/"
     cooldown: { default-days: 7 }</code></pre>
 
+  <h4>Dependabot's three features — what each one does</h4>
+
+  <p>Dependabot is actually three separate features bundled under one name. Knowing which does what avoids confusion:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>What it does</th>
+        <th>Cooldown?</th>
+        <th>How to enable</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Dependabot alerts</strong></td>
+        <td>Notifies you in the Security tab when a CVE is published for a package you depend on. No PR; just a heads-up.</td>
+        <td>n/a</td>
+        <td>On by default for public repos</td>
+      </tr>
+      <tr>
+        <td><strong>Dependabot security updates</strong> 🛟</td>
+        <td>Opens a PR <em>immediately</em> with the version bump that fixes a published CVE. This is the "auto-fix" you actually want.</td>
+        <td><strong>No</strong> — security fixes bypass cooldown so you get the patch ASAP</td>
+        <td>Settings → Code security → <strong>Enable</strong> "Dependabot security updates" (single toggle, no config file)</td>
+      </tr>
+      <tr>
+        <td><strong>Dependabot version updates</strong></td>
+        <td>Opens routine PRs for non-security version bumps on a schedule (weekly here).</td>
+        <td>Yes — 7 days per our config</td>
+        <td>The <code>.github/dependabot.yml</code> file above</td>
+      </tr>
+    </tbody>
+  </table>
+
   <div class="callout ok">
-    <p><strong>Security advisories bypass cooldown.</strong> When GitHub publishes a CVE for a package you depend on, Dependabot opens the fix PR <em>immediately</em> regardless of the 7-day setting. Cooldown only applies to routine version bumps, not to "your current pinned version has a known exploit, upgrade now" notifications.</p>
+    <p><strong>The combination is the point.</strong> Routine version updates wait 7 days so brand-new malicious releases get caught by the community first; security updates (where a CVE is already known) ship instantly because there's no upside to waiting. Different threat models, both addressed.</p>
   </div>
 
-  <p>To enable: GitHub repo → Settings → Code security → enable Dependabot version updates and Dependabot security updates. Dependabot is free for public repos and built into GitHub (no third-party app to install).</p>
+  <p>To enable both: GitHub repo → <strong>Settings → Code security</strong> → toggle on both "Dependabot security updates" and "Dependabot version updates". Free for public repos, built into GitHub (no third-party app to install). The version-updates toggle reads our <code>.github/dependabot.yml</code> for ecosystem + cooldown settings; the security-updates toggle has no config file — it's just on or off.</p>
+
+  <h4>Layered defense — how the four security gates fit together</h4>
+
+  <table>
+    <thead>
+      <tr><th>Gate</th><th>When</th><th>What it catches</th><th>What it does</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Dependabot version updates</td>
+        <td>Weekly</td>
+        <td>Stale deps (out-of-date packages with no known exploit yet)</td>
+        <td>Opens routine update PRs (after 7-day cooldown)</td>
+      </tr>
+      <tr>
+        <td>Dependabot security updates</td>
+        <td>On CVE publication</td>
+        <td>Known-vulnerable deps you already use</td>
+        <td>Opens immediate fix PR (no cooldown)</td>
+      </tr>
+      <tr>
+        <td><code>pip-audit</code> / <code>npm audit</code></td>
+        <td>Every commit (CI)</td>
+        <td>Known-vulnerable deps in <code>requirements.txt</code> / <code>package.json</code></td>
+        <td>Fails the CI gate; blocks the image build</td>
+      </tr>
+      <tr>
+        <td>Trivy image scan</td>
+        <td>Every commit (CI)</td>
+        <td>OS-package + library CVEs in the built image</td>
+        <td>Fails the CI gate; blocks the Docker Hub push</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Dependabot is the <em>autonomic</em> layer (opens fix PRs without you asking). pip-audit/npm audit and Trivy are the <em>reactive</em> layer (a human pushed code; gate runs; bad deps don't merge or ship). All four operate independently and complement each other.</p>
 </section>
 
 <section id="identity">

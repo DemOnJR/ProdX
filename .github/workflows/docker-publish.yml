@@ -488,17 +488,13 @@ jobs:
   publish:
     name: 🚢 Publish to Docker Hub
     runs-on: ubuntu-latest
-    needs:
-      - backend-lint
-      - backend-tests
-      - backend-audit
-      - backend-build
-      - backend-scan
-      - frontend-typecheck
-      - frontend-vite
-      - frontend-audit
-      - frontend-build
-      - frontend-scan
+    # Only the two leaf jobs — backend-scan and frontend-scan transitively
+    # depend on every upstream phase (their `needs:` chains back through
+    # Build → Lint/Tests/Audit). Listing only the leaves keeps the Actions
+    # canvas clean (one arrow per pipeline into Publish, not ten); the
+    # effective gating is identical because if any upstream job fails, the
+    # corresponding scan job won't run, and Publish stays blocked.
+    needs: [backend-scan, frontend-scan]
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
