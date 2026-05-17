@@ -78,7 +78,7 @@ jobs:
       - name: Tags for prodx-api image
         if: github.event_name != 'pull_request'
         id: api-meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.API_IMAGE }}
           tags: |
@@ -183,7 +183,7 @@ jobs:
       - name: Tags for prodx-web image
         if: github.event_name != 'pull_request'
         id: web-meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.WEB_IMAGE }}
           tags: |
