@@ -110,18 +110,20 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
-      - name: 🛡️ Scan image  ·  Trivy (JSON, all severities)
+      - name: 🛡️ Scan image  ·  Trivy (gate on CRITICAL with fix available)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.LOCAL_TAG }}
-          exit-code: '0'                       # gating happens in the next step
-          format: json
+          # Built-in gate replaces the old trivy-summary.py parser:
+          #   - exit-code: 1  → fail this step on any matching finding
+          #   - severity: CRITICAL → consider CRITICAL CVEs only
+          #   - ignore-unfixed: true → ignore CVEs with no patch yet
+          # Net effect: same gate (block on CRITICAL with a known fix),
+          # output is Trivy's own table in the step log.
+          exit-code: '1'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
           vuln-type: 'os,library'
-          output: backend-trivy.json
-
-      - name: 📊 Trivy summary + CRITICAL-with-fix gate
-        working-directory: ${{ github.workspace }}
-        run: python3 .github/scripts/trivy-summary.py backend-trivy.json ${{ env.IMAGE }}:ci-scan
 
       # ─── Publish (main push only) ───────────────────────────────
       # Re-uses the image already loaded into local docker by the build
