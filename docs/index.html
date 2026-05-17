@@ -777,10 +777,49 @@ docker compose up --build</code></pre>
 
   <h4>Triggers + tags</h4>
   <ul>
-    <li>On <strong>pull requests</strong>: build + test + scan, no push.</li>
+    <li>On <strong>pull requests to <code>main</code></strong>: build + test + scan; no push to Docker Hub.</li>
     <li>On <strong>push to <code>main</code></strong>: pushes <code>:main</code>, <code>:latest</code>, and <code>:sha-xxxxxxx</code>.</li>
+    <li>On <strong>push to <code>dev</code></strong>: pushes <code>:dev</code> and <code>:sha-xxxxxxx</code>. <em>No</em> <code>:latest</code> tag — that's gated to the default branch only, so Argo CD never accidentally syncs dev code into the cluster.</li>
     <li>On a <strong>tag <code>v1.2.3</code></strong>: pushes <code>:1.2.3</code> + the SHA tag too.</li>
   </ul>
+
+  <h3>Branching model — GitHub Flow</h3>
+
+  <p>Two long-lived branches:</p>
+
+  <table>
+    <thead><tr><th>Branch</th><th>Role</th><th>What ships from it</th></tr></thead>
+    <tbody>
+      <tr><td><code>main</code></td><td>Always deployable. Argo CD watches it; pushes here go live in the cluster within ~3 minutes.</td><td><code>:latest</code> + <code>:main</code> + <code>:sha-xxxxxxx</code> images</td></tr>
+      <tr><td><code>dev</code></td><td>Daily working branch. Push freely; CI runs every push (lint + tests + audit + build + scan), but Argo CD doesn't watch it so nothing deploys.</td><td><code>:dev</code> + <code>:sha-xxxxxxx</code> images (no <code>:latest</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <p>Promotion path: <strong>commit to <code>dev</code> → open PR <code>dev → main</code> → CI re-runs on the merge target → merge when green → Docker Hub <code>:latest</code> updates → Argo CD syncs → live</strong>. Standard GitHub Flow.</p>
+
+  <h4>Recommended branch protection on <code>main</code></h4>
+
+  <p>To enforce the promotion path (no direct pushes to main, no merging until CI is green), set branch protection in the repo's settings. One-time setup, ~30 seconds:</p>
+
+  <ol>
+    <li>Open <code>https://github.com/&lt;you&gt;/ProdX/settings/branches</code></li>
+    <li>Click <strong>Add branch ruleset</strong> (or <strong>Add classic branch protection rule</strong> for the legacy UI).</li>
+    <li>Branch name pattern: <code>main</code></li>
+    <li>Enable:
+      <ul>
+        <li><strong>Require a pull request before merging</strong> — direct pushes to main blocked; everything goes through PR review.</li>
+        <li><strong>Require status checks to pass before merging</strong> — list the leaf jobs as required: <code>🛡️ Backend · Scan image</code> and <code>🛡️ Frontend · Scan image</code> (they transitively gate every upstream phase).</li>
+        <li><strong>Require branches to be up to date before merging</strong> — forces PR to be rebased on latest main before merge; surfaces conflicts before they land.</li>
+        <li><strong>Do not allow bypassing the above settings</strong> — applies the rules to admins too (i.e. you). Without this, GitHub silently lets repo owners push directly to main, which defeats the point.</li>
+      </ul>
+    </li>
+    <li>Save.</li>
+  </ol>
+
+  <div class="callout note">
+    <p>After enabling: <code>git push origin main</code> from your laptop will be rejected with <em>"protected branch"</em>. Workflow becomes: commit on <code>dev</code> → <code>git push origin dev</code> → <code>gh pr create --base main --head dev</code> → wait for CI → merge.</p>
+    <p>For Dependabot PRs, the same gates apply automatically — they can't auto-merge until CI passes. Combined with the cooldown + security update bypass already configured, this is the full automated update flow.</p>
+  </div>
 
   <p>Trigger the first run by pushing anything (or just an empty commit):</p>
 <pre><code>git commit --allow-empty -m "trigger CI"
