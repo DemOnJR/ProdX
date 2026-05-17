@@ -231,6 +231,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout (for the parser script)
+        uses: actions/checkout@v4
+
       - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
@@ -240,36 +243,33 @@ jobs:
       - name: Load image into local docker
         run: docker load -i /tmp/backend-image.tar
 
-      - name: Trivy image scan (CRITICAL, fixed-only, fail-on-finding)
+      # Trivy in INFORMATIONAL mode: scan everything, never fail the step
+      # itself. Gating + reporting happen in the next step against the JSON
+      # output, so the summary can show counts across ALL severities (not
+      # just the filtered CRITICAL ones the gating-only step would emit).
+      - name: Trivy scan (full, all severities, JSON)
         id: scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.API_IMAGE }}:ci-scan
-          severity: CRITICAL
-          exit-code: '1'
-          ignore-unfixed: true
-          format: table
+          exit-code: '0'
+          format: json
           vuln-type: 'os,library'
-          output: backend-trivy-report.txt
+          output: backend-trivy.json
 
-      - name: Upload Trivy report
+      - name: Parse Trivy + write rich summary + apply gate
+        id: gate
+        if: always() && steps.scan.outcome != 'skipped'
+        run: python3 .github/scripts/trivy-summary.py backend-trivy.json ${{ env.API_IMAGE }}:ci-scan
+
+      - name: Upload Trivy JSON report
         if: always() && steps.scan.outcome != 'skipped'
         uses: actions/upload-artifact@v4
         with:
           name: backend-trivy-report
-          path: backend-trivy-report.txt
+          path: backend-trivy.json
           retention-days: 14
           if-no-files-found: warn
-
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### 🛡️ Backend · Scan image"
-            echo "| Step | Result |"
-            echo "|------|--------|"
-            echo "| Trivy image scan | ${{ steps.scan.outcome }} |"
-          } >> "$GITHUB_STEP_SUMMARY"
 
   # ════════════════════════════════════════════════════════════════════
   # FRONTEND · 3 Quality jobs (parallel) → Build → Scan
@@ -453,6 +453,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout (for the parser script)
+        uses: actions/checkout@v4
+
       - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
@@ -462,36 +465,29 @@ jobs:
       - name: Load image into local docker
         run: docker load -i /tmp/frontend-image.tar
 
-      - name: Trivy image scan (CRITICAL, fixed-only, fail-on-finding)
+      - name: Trivy scan (full, all severities, JSON)
         id: scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.WEB_IMAGE }}:ci-scan
-          severity: CRITICAL
-          exit-code: '1'
-          ignore-unfixed: true
-          format: table
+          exit-code: '0'
+          format: json
           vuln-type: 'os,library'
-          output: frontend-trivy-report.txt
+          output: frontend-trivy.json
 
-      - name: Upload Trivy report
+      - name: Parse Trivy + write rich summary + apply gate
+        id: gate
+        if: always() && steps.scan.outcome != 'skipped'
+        run: python3 .github/scripts/trivy-summary.py frontend-trivy.json ${{ env.WEB_IMAGE }}:ci-scan
+
+      - name: Upload Trivy JSON report
         if: always() && steps.scan.outcome != 'skipped'
         uses: actions/upload-artifact@v4
         with:
           name: frontend-trivy-report
-          path: frontend-trivy-report.txt
+          path: frontend-trivy.json
           retention-days: 14
           if-no-files-found: warn
-
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### 🛡️ Frontend · Scan image"
-            echo "| Step | Result |"
-            echo "|------|--------|"
-            echo "| Trivy image scan | ${{ steps.scan.outcome }} |"
-          } >> "$GITHUB_STEP_SUMMARY"
 
   # ════════════════════════════════════════════════════════════════════
   # MERGE POINT — Publish, gated on every prior job
