@@ -10,7 +10,6 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/ci-frontend.yml'
-      - '.github/scripts/trivy-summary.py'
   pull_request:
     branches: [main]
 
