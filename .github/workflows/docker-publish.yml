@@ -12,54 +12,53 @@ env:
   API_IMAGE: pbdaemon/prodx-api
   WEB_IMAGE: pbdaemon/prodx-web
 
-# Two parallel jobs (Backend + Frontend), each organized into 7 phases
-# with emoji-prefixed step names so the Actions UI reads as a pipeline:
+# Pipeline visualization on the Actions canvas:
 #
-#   📦 Setup  → 🔍 Quality  → 🔨 Build  → 🛡️ Security  → 🔐 Auth  → 🏷️ Tag  → 🚢 Release  → ✅ Summary
+#   [🔍 Backend · Quality]  → [🔨 Backend · Build]  → [🛡️ Backend · Scan]   ╲
+#                                                                              [🚢 Publish]
+#   [🔍 Frontend · Quality] → [🔨 Frontend · Build] → [🛡️ Frontend · Scan]  ╱
 #
-# The final ✅ Summary step prints a markdown table to GITHUB_STEP_SUMMARY
-# (visible above the raw logs on the run page) with pass/fail/skip per phase.
+# 7 jobs, with explicit `needs:` between phases. Each box on the canvas is one
+# job. Image artifacts flow from Build → Scan via docker save / load. Publish
+# rebuilds-from-cache (fast: Buildx GHA cache was populated by the Build jobs)
+# and pushes both images in one place.
 
 jobs:
-  # ──────────────────────────────────────────────────────────────────────
-  backend:
-    name: Backend · FastAPI
+  # ════════════════════════════════════════════════════════════════════
+  # BACKEND PIPELINE
+  # ════════════════════════════════════════════════════════════════════
+
+  backend-quality:
+    name: 🔍 Backend · Quality
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
     defaults:
       run:
         working-directory: ./backend
-
     steps:
-      # ──── 📦 Setup ───────────────────────────────────────────────────
-      - name: '📦 Checkout source'
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: '📦 Set up Python 3.12'
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
           cache-dependency-path: backend/requirements-dev.txt
 
-      - name: '📦 Install dependencies (runtime + dev)'
-        id: install
-        run: |
-          pip install -r requirements-dev.txt
-          echo "package_count=$(pip list --format=freeze | wc -l)" >> "$GITHUB_OUTPUT"
+      - name: Install dependencies (runtime + dev)
+        run: pip install -r requirements-dev.txt
 
-      # ──── 🔍 Quality ─────────────────────────────────────────────────
-      - name: '🔍 Lint (ruff)'
+      - name: Lint (ruff)
         id: lint
         run: ruff check app/ tests/
 
-      - name: '🔍 Tests (pytest, JUnit XML)'
+      - name: Tests (pytest, JUnit XML)
         id: tests
         run: pytest --junitxml=test-results.xml
 
-      - name: '📤 Upload test results (artifact)'
+      - name: Upload test results
         if: always() && steps.tests.outcome != 'skipped'
         uses: actions/upload-artifact@v4
         with:
@@ -67,11 +66,32 @@ jobs:
           path: backend/test-results.xml
           retention-days: 14
 
-      # ──── 🔨 Build ───────────────────────────────────────────────────
-      - name: '🔨 Set up Docker Buildx'
+      - name: Summary
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          {
+            echo "### 🔍 Backend · Quality"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| Lint (ruff)       | ${{ steps.lint.outcome }}  |"
+            echo "| Tests (pytest)    | ${{ steps.tests.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  backend-build:
+    name: 🔨 Backend · Build
+    runs-on: ubuntu-latest
+    needs: backend-quality
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: '🔨 Build image (local tag, for scan)'
+      - name: Build image (load locally + populate cache)
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -82,8 +102,46 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
-      # ──── 🛡️ Security ────────────────────────────────────────────────
-      - name: '🛡️ Trivy CVE scan (CRITICAL, fixed-only, fail-on-finding)'
+      - name: Save image as tarball (for the Scan job)
+        if: steps.build.outcome == 'success'
+        run: docker save ${{ env.API_IMAGE }}:ci-scan -o /tmp/backend-image.tar
+
+      - name: Upload image artifact
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-image
+          path: /tmp/backend-image.tar
+          retention-days: 1
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### 🔨 Backend · Build"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| Docker build  | ${{ steps.build.outcome }} |"
+            echo "| Image tarball | passed to Scan job via artifact |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  backend-scan:
+    name: 🛡️ Backend · Scan
+    runs-on: ubuntu-latest
+    needs: backend-build
+    permissions:
+      contents: read
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-image
+          path: /tmp/
+
+      - name: Load image into local docker
+        run: docker load -i /tmp/backend-image.tar
+
+      - name: Trivy CVE scan (CRITICAL, fixed-only, fail-on-finding)
         id: scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -95,129 +153,85 @@ jobs:
           vuln-type: 'os,library'
           output: backend-trivy-report.txt
 
-      - name: '📤 Upload Trivy report (artifact)'
+      - name: Upload Trivy report
         if: always() && steps.scan.outcome != 'skipped'
         uses: actions/upload-artifact@v4
         with:
           name: backend-trivy-report
-          # Trivy writes to workspace root (action steps don't honor the
-          # job's defaults.run.working-directory), so the file is here:
           path: backend-trivy-report.txt
           retention-days: 14
           if-no-files-found: warn
 
-      # ──── 🔐 Auth (push events only) ─────────────────────────────────
-      - name: '🔐 Log in to Docker Hub'
-        id: login
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # ──── 🏷️ Tag (push events only) ──────────────────────────────────
-      - name: '🏷️ Compute image tags'
-        id: meta
-        if: github.event_name != 'pull_request'
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.API_IMAGE }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=sha,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      # ──── 🚢 Release (push events only) ──────────────────────────────
-      - name: '🚢 Push to Docker Hub'
-        id: push
-        if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
-
-      # ──── ✅ Summary (always, even on failure) ───────────────────────
-      - name: '✅ Pipeline summary'
+      - name: Summary
         if: always()
-        working-directory: ${{ github.workspace }}
         run: |
-          icon() {
-            case "$1" in
-              success)   echo "✅ passed" ;;
-              failure)   echo "❌ failed" ;;
-              skipped)   echo "⏭️ skipped (PR)" ;;
-              cancelled) echo "🛑 cancelled" ;;
-              *)         echo "— $1" ;;
-            esac
-          }
           {
-            echo "## 🐍 Backend · FastAPI pipeline"
-            echo ""
-            echo "| Phase | Step | Result |"
-            echo "|-------|------|--------|"
-            echo "| 📦 Setup | Install deps (${{ steps.install.outputs.package_count || '?' }} pkgs) | $(icon '${{ steps.install.outcome }}') |"
-            echo "| 🔍 Quality | Lint (ruff) | $(icon '${{ steps.lint.outcome }}') |"
-            echo "| 🔍 Quality | Tests (pytest) | $(icon '${{ steps.tests.outcome }}') |"
-            echo "| 🔨 Build | Docker image | $(icon '${{ steps.build.outcome }}') |"
-            echo "| 🛡️ Security | Trivy CVE scan | $(icon '${{ steps.scan.outcome }}') |"
-            echo "| 🔐 Auth | Docker Hub login | $(icon '${{ steps.login.outcome }}') |"
-            echo "| 🏷️ Tag | Image tag metadata | $(icon '${{ steps.meta.outcome }}') |"
-            echo "| 🚢 Release | Push to Docker Hub | $(icon '${{ steps.push.outcome }}') |"
-            echo ""
-            echo "**Image:** \`${{ env.API_IMAGE }}\`"
-            echo "**Artifacts:** \`backend-test-results\` (JUnit XML), \`backend-trivy-report\` (Trivy table output)"
+            echo "### 🛡️ Backend · Scan"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| Trivy CVE scan | ${{ steps.scan.outcome }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # ──────────────────────────────────────────────────────────────────────
-  frontend:
-    name: Frontend · React + Vite
+  # ════════════════════════════════════════════════════════════════════
+  # FRONTEND PIPELINE
+  # ════════════════════════════════════════════════════════════════════
+
+  frontend-quality:
+    name: 🔍 Frontend · Quality
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
     defaults:
       run:
         working-directory: ./frontend
-
     steps:
-      # ──── 📦 Setup ───────────────────────────────────────────────────
-      - name: '📦 Checkout source'
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: '📦 Set up Node 22'
+      - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # No `cache: 'npm'` because we don't commit package-lock.json — the
-          # setup-node cache requires a lockfile. Commit one and add the cache
-          # back when we have time.
+          # No `cache: 'npm'` — see comment in earlier commits; we don't
+          # commit package-lock.json so the setup-node cache can't engage.
 
-      - name: '📦 Install dependencies'
-        id: install
-        run: |
-          npm install --no-audit --no-fund
-          echo "package_count=$(npm list --depth=0 --parseable 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
 
-      # ──── 🔍 Quality ─────────────────────────────────────────────────
-      - name: '🔍 TypeScript check (tsc --noEmit)'
+      - name: TypeScript check (tsc --noEmit)
         id: typecheck
         run: npx tsc --noEmit
 
-      - name: '🔍 Production build (vite)'
+      - name: Production build (vite)
         id: vitebuild
         run: npm run build
 
-      # ──── 🔨 Build ───────────────────────────────────────────────────
-      - name: '🔨 Set up Docker Buildx'
+      - name: Summary
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          {
+            echo "### 🔍 Frontend · Quality"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| TypeScript check   | ${{ steps.typecheck.outcome }} |"
+            echo "| Vite production    | ${{ steps.vitebuild.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  frontend-build:
+    name: 🔨 Frontend · Build
+    runs-on: ubuntu-latest
+    needs: frontend-quality
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: '🔨 Build image (local tag, for scan)'
+      - name: Build image (load locally + populate cache)
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -228,8 +242,46 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
-      # ──── 🛡️ Security ────────────────────────────────────────────────
-      - name: '🛡️ Trivy CVE scan (CRITICAL, fixed-only, fail-on-finding)'
+      - name: Save image as tarball (for the Scan job)
+        if: steps.build.outcome == 'success'
+        run: docker save ${{ env.WEB_IMAGE }}:ci-scan -o /tmp/frontend-image.tar
+
+      - name: Upload image artifact
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-image
+          path: /tmp/frontend-image.tar
+          retention-days: 1
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### 🔨 Frontend · Build"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| Docker build  | ${{ steps.build.outcome }} |"
+            echo "| Image tarball | passed to Scan job via artifact |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  frontend-scan:
+    name: 🛡️ Frontend · Scan
+    runs-on: ubuntu-latest
+    needs: frontend-build
+    permissions:
+      contents: read
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-image
+          path: /tmp/
+
+      - name: Load image into local docker
+        run: docker load -i /tmp/frontend-image.tar
+
+      - name: Trivy CVE scan (CRITICAL, fixed-only, fail-on-finding)
         id: scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -241,7 +293,7 @@ jobs:
           vuln-type: 'os,library'
           output: frontend-trivy-report.txt
 
-      - name: '📤 Upload Trivy report (artifact)'
+      - name: Upload Trivy report
         if: always() && steps.scan.outcome != 'skipped'
         uses: actions/upload-artifact@v4
         with:
@@ -250,19 +302,75 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-      # ──── 🔐 Auth (push events only) ─────────────────────────────────
-      - name: '🔐 Log in to Docker Hub'
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### 🛡️ Frontend · Scan"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| Trivy CVE scan | ${{ steps.scan.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ════════════════════════════════════════════════════════════════════
+  # MERGE POINT: PUBLISH (single job that depends on every prior phase)
+  # ════════════════════════════════════════════════════════════════════
+
+  publish:
+    name: 🚢 Publish to Docker Hub
+    runs-on: ubuntu-latest
+    needs:
+      - backend-quality
+      - backend-build
+      - backend-scan
+      - frontend-quality
+      - frontend-build
+      - frontend-scan
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
         id: login
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ──── 🏷️ Tag (push events only) ──────────────────────────────────
-      - name: '🏷️ Compute image tags'
-        id: meta
-        if: github.event_name != 'pull_request'
+      # ─── Backend image ───────────────────────────────────────────
+      - name: Compute backend image tags
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.API_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build & push prodx-api
+        id: push-api
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          # Cache populated by the Backend · Build job — this is essentially
+          # a tag-and-push from cached layers, not a real rebuild.
+          cache-from: type=gha,scope=backend
+
+      # ─── Frontend image ──────────────────────────────────────────
+      - name: Compute frontend image tags
+        id: meta-web
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.WEB_IMAGE }}
@@ -272,48 +380,30 @@ jobs:
             type=sha,format=short
             type=raw,value=latest,enable={{is_default_branch}}
 
-      # ──── 🚢 Release (push events only) ──────────────────────────────
-      - name: '🚢 Push to Docker Hub'
-        id: push
-        if: github.event_name != 'pull_request'
+      - name: Build & push prodx-web
+        id: push-web
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
           cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
 
-      # ──── ✅ Summary (always, even on failure) ───────────────────────
-      - name: '✅ Pipeline summary'
+      # ─── Pipeline-wide summary ───────────────────────────────────
+      - name: Final pipeline summary
         if: always()
-        working-directory: ${{ github.workspace }}
         run: |
-          icon() {
-            case "$1" in
-              success)   echo "✅ passed" ;;
-              failure)   echo "❌ failed" ;;
-              skipped)   echo "⏭️ skipped (PR)" ;;
-              cancelled) echo "🛑 cancelled" ;;
-              *)         echo "— $1" ;;
-            esac
-          }
           {
-            echo "## ⚛️ Frontend · React + Vite pipeline"
+            echo "## 🚢 Publish complete"
             echo ""
-            echo "| Phase | Step | Result |"
-            echo "|-------|------|--------|"
-            echo "| 📦 Setup | Install deps | $(icon '${{ steps.install.outcome }}') |"
-            echo "| 🔍 Quality | TypeScript check | $(icon '${{ steps.typecheck.outcome }}') |"
-            echo "| 🔍 Quality | Vite production build | $(icon '${{ steps.vitebuild.outcome }}') |"
-            echo "| 🔨 Build | Docker image | $(icon '${{ steps.build.outcome }}') |"
-            echo "| 🛡️ Security | Trivy CVE scan | $(icon '${{ steps.scan.outcome }}') |"
-            echo "| 🔐 Auth | Docker Hub login | $(icon '${{ steps.login.outcome }}') |"
-            echo "| 🏷️ Tag | Image tag metadata | $(icon '${{ steps.meta.outcome }}') |"
-            echo "| 🚢 Release | Push to Docker Hub | $(icon '${{ steps.push.outcome }}') |"
+            echo "Both pipelines passed Quality + Build + Scan. Images pushed:"
             echo ""
-            echo "**Image:** \`${{ env.WEB_IMAGE }}\`"
-            echo "**Artifacts:** \`frontend-trivy-report\` (Trivy table output)"
+            echo "| Image | Tags |"
+            echo "|-------|------|"
+            echo "| \`${{ env.API_IMAGE }}\` | ${{ steps.meta-api.outputs.tags && '✅ pushed' || '❌ skipped' }} |"
+            echo "| \`${{ env.WEB_IMAGE }}\` | ${{ steps.meta-web.outputs.tags && '✅ pushed' || '❌ skipped' }} |"
+            echo ""
+            echo "Per-phase results visible in each job's own summary."
           } >> "$GITHUB_STEP_SUMMARY"
