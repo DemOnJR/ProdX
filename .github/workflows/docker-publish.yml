@@ -17,6 +17,11 @@ env:
   REGISTRY: docker.io
   API_IMAGE: pbdaemon/prodx-api
   WEB_IMAGE: pbdaemon/prodx-web
+  # Opt every JavaScript action into Node.js 24 immediately. Without this,
+  # GitHub prints a deprecation warning per Node-20 action invocation; from
+  # June 2 2026 it'll force Node 24 anyway; Node 20 is removed Sept 16 2026.
+  # See https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 # Pipeline graph rendered on the Actions canvas:
 #
@@ -54,10 +59,10 @@ jobs:
         working-directory: ./backend
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -91,10 +96,10 @@ jobs:
         working-directory: ./backend
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -109,7 +114,7 @@ jobs:
 
       - name: Upload test results
         if: always() && steps.pytest.outcome != 'skipped'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-test-results
           path: backend/test-results.xml
@@ -136,10 +141,10 @@ jobs:
         working-directory: ./backend
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -160,7 +165,7 @@ jobs:
 
       - name: Upload audit report
         if: always() && steps.audit.outcome != 'skipped'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-deps-audit
           path: backend/audit.json
@@ -186,14 +191,14 @@ jobs:
       contents: read
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build image (load locally + populate cache)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           file: ./backend/Dockerfile
@@ -208,7 +213,7 @@ jobs:
 
       - name: Upload image artifact (for Scan job)
         if: steps.build.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-image
           path: /tmp/backend-image.tar
@@ -232,10 +237,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout (for the parser script)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: backend-image
           path: /tmp/
@@ -264,7 +269,7 @@ jobs:
 
       - name: Upload Trivy JSON report
         if: always() && steps.scan.outcome != 'skipped'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-trivy-report
           path: backend-trivy.json
@@ -285,10 +290,10 @@ jobs:
         working-directory: ./frontend
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -322,10 +327,10 @@ jobs:
         working-directory: ./frontend
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -359,10 +364,10 @@ jobs:
         working-directory: ./frontend
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -382,7 +387,7 @@ jobs:
 
       - name: Upload audit report
         if: always() && steps.audit.outcome != 'skipped'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-deps-audit
           path: frontend/audit.json
@@ -408,14 +413,14 @@ jobs:
       contents: read
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build image (load locally + populate cache)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
@@ -430,7 +435,7 @@ jobs:
 
       - name: Upload image artifact (for Scan job)
         if: steps.build.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-image
           path: /tmp/frontend-image.tar
@@ -454,10 +459,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout (for the parser script)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: frontend-image
           path: /tmp/
@@ -482,7 +487,7 @@ jobs:
 
       - name: Upload Trivy JSON report
         if: always() && steps.scan.outcome != 'skipped'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-trivy-report
           path: frontend-trivy.json
@@ -508,14 +513,14 @@ jobs:
       contents: read
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
         id: login
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -523,7 +528,7 @@ jobs:
       # ─── Backend image ───────────────────────────────────────────
       - name: Compute backend image tags
         id: meta-api
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.API_IMAGE }}
           tags: |
@@ -534,7 +539,7 @@ jobs:
 
       - name: Build & push prodx-api
         id: push-api
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           file: ./backend/Dockerfile
@@ -548,7 +553,7 @@ jobs:
       # ─── Frontend image ──────────────────────────────────────────
       - name: Compute frontend image tags
         id: meta-web
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.WEB_IMAGE }}
           tags: |
@@ -559,7 +564,7 @@ jobs:
 
       - name: Build & push prodx-web
         id: push-web
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
