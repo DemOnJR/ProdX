@@ -152,48 +152,22 @@ jobs:
             docker push "$tag"
           done <<< "${{ steps.meta.outputs.tags }}"
 
-      # ─── GitOps trigger ─────────────────────────────────────────
-      # Bumps the api image tag in ProdXCD/charts/prodx/values.yaml from
-      # whatever-it-was to sha-<this commit>. Argo CD polls ProdXCD every
-      # ~3 min and reconciles: the deployment spec changes (image tag
-      # bumped), K8s rolls the pods, new pods pull from GAR. End-to-end
-      # automatic, no kubectl required.
+      # ─── Trigger pod rollout via WIF (no GitHub secret needed) ──
+      # Reuses the GCP token already minted by the WIF auth step above:
+      # gcloud `get-credentials` writes a kubeconfig, then a `kubectl
+      # rollout restart` forces a rolling update on the deployment.
+      # Because `imagePullPolicy: Always` is set on the Helm chart,
+      # the new pods pull whatever `:latest` resolves to in GAR right
+      # now — which is the image we just pushed two steps up.
       #
-      # The retry loop handles the race where ci-backend and ci-frontend
-      # both push to ProdXCD at the same time (when a commit touches both
-      # services). yq is preinstalled on ubuntu-latest runners.
-      - name: 🔁 Bump ProdXCD api tag → trigger Argo CD reconcile
+      # IAM: the publisher SA (gha-prodx-publisher@...) needs the
+      # `roles/container.developer` role on the project. Granted in
+      # ProdXTF/modules/registry/main.tf — apply ProdXTF before merging
+      # this PR or the kubectl call will get a 403.
+      - name: 🔁 Roll deployment to pull the new :latest from GAR
         if: github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.PRODXCD_PAT }}
-        shell: bash
         run: |
-          set -euo pipefail
-          NEW_TAG="sha-${GITHUB_SHA:0:7}"
-          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/DemOnJR/ProdXCD.git"
-
-          git clone --depth=1 "$REPO_URL" /tmp/ProdXCD
-          cd /tmp/ProdXCD
-          git config user.email "ci@prodx.bot"
-          git config user.name  "ProdX CI"
-
-          for attempt in 1 2 3; do
-            git fetch origin main
-            git reset --hard origin/main
-            yq -i ".images.api.tag = \"$NEW_TAG\"" charts/prodx/values.yaml
-            if git diff --quiet; then
-              echo "✓ ProdXCD already at $NEW_TAG; nothing to commit"
-              exit 0
-            fi
-            git add charts/prodx/values.yaml
-            git commit -m "deploy: prodx-api → $NEW_TAG (ProdX@${GITHUB_SHA:0:7})"
-            if git push origin main; then
-              echo "✓ ProdXCD bumped: prodx-api → $NEW_TAG"
-              echo "  Argo CD will reconcile within ~3 min."
-              exit 0
-            fi
-            echo "Push rejected (concurrent update?), retry $attempt/3..."
-            sleep 5
-          done
-          echo "✗ Failed to bump ProdXCD after 3 attempts" >&2
-          exit 1
+          gcloud container clusters get-credentials prodx-dev-gke \
+            --zone europe-west3-a --project prodx-dev2
+          kubectl -n prodx rollout restart deployment/prodx-api
+          kubectl -n prodx rollout status deployment/prodx-api --timeout=180s

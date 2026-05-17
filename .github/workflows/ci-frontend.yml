@@ -131,41 +131,12 @@ jobs:
             docker push "$tag"
           done <<< "${{ steps.meta.outputs.tags }}"
 
-      # ─── GitOps trigger ─────────────────────────────────────────
-      # See ci-backend.yml for the full rationale. Mirror of the api
-      # bump, just for the web image's tag in ProdXCD.
-      - name: 🔁 Bump ProdXCD web tag → trigger Argo CD reconcile
+      # ─── Trigger pod rollout via WIF (no GitHub secret needed) ──
+      # See ci-backend.yml for the full rationale.
+      - name: 🔁 Roll deployment to pull the new :latest from GAR
         if: github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.PRODXCD_PAT }}
-        shell: bash
         run: |
-          set -euo pipefail
-          NEW_TAG="sha-${GITHUB_SHA:0:7}"
-          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/DemOnJR/ProdXCD.git"
-
-          git clone --depth=1 "$REPO_URL" /tmp/ProdXCD
-          cd /tmp/ProdXCD
-          git config user.email "ci@prodx.bot"
-          git config user.name  "ProdX CI"
-
-          for attempt in 1 2 3; do
-            git fetch origin main
-            git reset --hard origin/main
-            yq -i ".images.web.tag = \"$NEW_TAG\"" charts/prodx/values.yaml
-            if git diff --quiet; then
-              echo "✓ ProdXCD already at $NEW_TAG; nothing to commit"
-              exit 0
-            fi
-            git add charts/prodx/values.yaml
-            git commit -m "deploy: prodx-web → $NEW_TAG (ProdX@${GITHUB_SHA:0:7})"
-            if git push origin main; then
-              echo "✓ ProdXCD bumped: prodx-web → $NEW_TAG"
-              echo "  Argo CD will reconcile within ~3 min."
-              exit 0
-            fi
-            echo "Push rejected (concurrent update?), retry $attempt/3..."
-            sleep 5
-          done
-          echo "✗ Failed to bump ProdXCD after 3 attempts" >&2
-          exit 1
+          gcloud container clusters get-credentials prodx-dev-gke \
+            --zone europe-west3-a --project prodx-dev2
+          kubectl -n prodx rollout restart deployment/prodx-web
+          kubectl -n prodx rollout status deployment/prodx-web --timeout=180s
