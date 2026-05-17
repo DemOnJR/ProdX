@@ -80,20 +80,33 @@ jobs:
         if: github.event_name == 'pull_request'
         run: pip-audit -r requirements.txt
 
-      # ─── Build + Trivy scan (runs on PR AND main) ───────────────
-      # Catches Dockerfile breakages + new CRITICAL CVEs at PR time so
-      # bad code doesn't merge. The image is built locally (load: true);
-      # publishing to GAR is deferred to main pushes only (steps below).
+      # ─── Image phase (build + scan; runs on PR AND main) ───────
+      # Single docker build per CI run. Publish (further down) retags
+      # the locally-built image and `docker push`es it — no second
+      # buildkit invocation. Catches Dockerfile breakages + new CRITICAL
+      # CVEs at PR time before bad code can merge.
       - name: 🐳 Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: 🔨 Build image (local, populate cache for Publish)
+      - name: 🏷️ Compute image tags + OCI labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: 🔨 Build image (load locally, bake OCI labels)
         uses: docker/build-push-action@v7
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          load: true
+          load: true                          # → local docker (for Trivy + push)
           tags: ${{ env.LOCAL_TAG }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
@@ -111,6 +124,9 @@ jobs:
         run: python3 .github/scripts/trivy-summary.py backend-trivy.json ${{ env.IMAGE }}:ci-scan
 
       # ─── Publish (main push only) ───────────────────────────────
+      # Re-uses the image already loaded into local docker by the build
+      # step above. `docker tag` is metadata-only (zero seconds), and
+      # `docker push` uploads layers directly. No buildkit, no rebuild.
       - name: 🔑 Auth to GCP  ·  Workload Identity Federation
         if: github.event_name != 'pull_request'
         uses: google-github-actions/auth@v3
@@ -122,25 +138,14 @@ jobs:
         if: github.event_name != 'pull_request'
         run: gcloud auth configure-docker ${{ env.GAR_HOST }} --quiet
 
-      - name: 🏷️ Compute image tags
+      - name: 🚢 Tag local image + push each tag to GAR
         if: github.event_name != 'pull_request'
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=sha,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: 🚢 Push to Artifact Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v7
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=backend
+        shell: bash
+        run: |
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            echo "▸ docker tag ${{ env.LOCAL_TAG }} $tag"
+            docker tag "${{ env.LOCAL_TAG }}" "$tag"
+            echo "▸ docker push $tag"
+            docker push "$tag"
+          done <<< "${{ steps.meta.outputs.tags }}"
