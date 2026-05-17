@@ -13,6 +13,11 @@ ignore = [
             # router endpoint that uses dependency injection.
 ]
 
+[tool.ruff.lint.isort]
+# Without this, ruff treats `app.*` as third-party and complains about the
+# blank line separating it from stdlib/third-party imports (I001).
+known-first-party = ["app"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
