@@ -32,6 +32,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       CACHE_TTL_SECONDS: "60"
       CORS_ORIGINS: "http://localhost:8080,http://localhost:5173,http://127.0.0.1:8080,http://127.0.0.1:5173"
+      # Set FORCE_SEED=true to overwrite the prodx graph from seed.py on each
+      # container restart (useful when you ship graph updates). Off by default
+      # so user edits via PUT /api/graphs/prodx aren't clobbered.
+      FORCE_SEED: ${FORCE_SEED:-false}
     depends_on:
       postgres:
         condition: service_healthy

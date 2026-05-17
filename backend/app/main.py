@@ -9,6 +9,8 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import Session as OrmSession
 
+import os
+
 from app.cache import (
     get_client,
     get_graph as cache_get,
@@ -26,11 +28,24 @@ GRAPH_ID = "prodx"
 
 
 def seed(settings: Settings) -> None:
+    """Insert the bundled prodx graph if missing. Overwrite if FORCE_SEED=true.
+
+    Set FORCE_SEED=true on the api Deployment to make pod restarts replace
+    the stored graph with whatever's in app.seed.PRODX_GRAPH — useful for
+    shipping graph updates without manually PUTting through the API.
+    """
+    force = os.getenv("FORCE_SEED", "false").lower() in ("true", "1", "yes")
     engine = get_engine()
     with OrmSession(bind=engine) as db:
-        if db.get(Graph, GRAPH_ID) is None:
+        existing = db.get(Graph, GRAPH_ID)
+        if existing is None:
             db.add(Graph(id=GRAPH_ID, payload=PRODX_GRAPH))
             db.commit()
+        elif force:
+            existing.payload = PRODX_GRAPH
+            db.commit()
+            # Bust the Redis cache so the next GET returns the fresh payload.
+            invalidate_graph(GRAPH_ID)
 
 
 @asynccontextmanager
