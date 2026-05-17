@@ -662,14 +662,19 @@ footer {
   <h2><span class="step">03</span>Prerequisites</h2>
 
   <h3>Tools to install</h3>
+
+  <div class="callout note">
+    <p>All commands in this document assume <strong>Ubuntu 22.04 / 24.04</strong> (server or desktop, native or WSL2). See <a href="#commands">section 15.1</a> for the single copy-paste block that installs everything below.</p>
+  </div>
+
   <table>
-    <thead><tr><th>Tool</th><th>Why</th><th>Install (Windows / winget)</th></tr></thead>
+    <thead><tr><th>Tool</th><th>Why</th><th>Install (Ubuntu)</th></tr></thead>
     <tbody>
-      <tr><td>Git</td><td>Clone + push</td><td><code>winget install Git.Git</code></td></tr>
-      <tr><td>Docker Desktop</td><td>Run the local stack, build images</td><td><code>winget install Docker.DockerDesktop</code></td></tr>
-      <tr><td>gcloud CLI</td><td>Authenticate Terraform to GCP, kubeconfig</td><td><code>winget install Google.CloudSDK</code></td></tr>
-      <tr><td>Terraform</td><td>Provision GCP + Cloudflare</td><td><code>winget install Hashicorp.Terraform</code></td></tr>
-      <tr><td>kubectl</td><td>Talk to the cluster</td><td>Installed with gcloud (<code>gcloud components install kubectl</code>) or <code>winget install Kubernetes.kubectl</code></td></tr>
+      <tr><td>Git, curl, jq</td><td>Clone + push, JSON munging</td><td><code>sudo apt install -y git curl jq</code></td></tr>
+      <tr><td>Docker Engine</td><td>Run the local stack, build images</td><td><code>curl -fsSL https://get.docker.com | sudo sh</code></td></tr>
+      <tr><td>gcloud CLI</td><td>Authenticate Terraform to GCP, kubeconfig</td><td>Google Cloud apt repo — see 15.1</td></tr>
+      <tr><td>Terraform</td><td>Provision GCP, K8s manifests</td><td>HashiCorp apt repo — see 15.1</td></tr>
+      <tr><td>kubectl</td><td>Talk to the cluster</td><td>Kubernetes pkgs.k8s.io apt repo — see 15.1</td></tr>
     </tbody>
   </table>
 
@@ -785,13 +790,14 @@ git push</code></pre>
   <p>If you don't already have a billing account: sign up at <a href="https://cloud.google.com/free">cloud.google.com/free</a> and claim the $300 / 90-day trial. The trial creates a billing account; we'll create the project itself with Terraform in step 10.</p>
 
   <h3>7.2 — Install and authenticate gcloud</h3>
-<pre><code># Windows
-winget install Google.CloudSDK
+<pre><code># Install via Google's apt repo (one-time)
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+  | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+sudo apt update &amp;&amp; sudo apt install -y google-cloud-cli
 
-# WSL / Linux
-sudo snap install google-cloud-cli --classic
-
-# Either way
+# Authenticate (opens browser; if you're on a headless server, see 'gcloud auth login --no-browser')
 gcloud auth login
 gcloud auth application-default login</code></pre>
 
@@ -869,8 +875,14 @@ gcloud auth application-default login</code></pre>
         <p><strong>Why local execution?</strong> Remote execution requires uploading GCP + Cloudflare credentials to HCP Terraform. Local execution runs <code>terraform apply</code> on your machine using your <code>gcloud</code> ADC and your <code>terraform.tfvars</code>; only the state file lives in HCP. Simpler to start with — we can switch to remote execution + workload identity federation later.</p>
       </div>
     </li>
-    <li>On your machine, log Terraform into HCP:
-<pre><code>winget install Hashicorp.Terraform
+    <li>On your machine, install Terraform from HashiCorp's apt repo and log into HCP:
+<pre><code># One-time: add HashiCorp's signed apt repo
+wget -O- https://apt.releases.hashicorp.com/gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+  | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update &amp;&amp; sudo apt install -y terraform
+
 terraform login</code></pre>
       A browser window opens, you approve, and a token is written to <code>~/.terraform.d/credentials.tfrc.json</code>.</li>
   </ol>
@@ -1079,6 +1091,11 @@ terraform apply -target=module.argocd -target=module.cloudflared
 # Stage 2b — the root Argo CD Application that points at ProdXCD (~1 second:
 # just a CR creation; the actual workload sync happens inside Argo afterward)
 terraform apply</code></pre>
+
+  <p><strong>One-liner for the lazy</strong> — chain all three with <code>&amp;&amp;</code> so a failure in any stage stops the chain. Total ~22 minutes hands-off; safe to walk away:</p>
+<pre><code>terraform apply -target=module.network -target=module.cluster -auto-approve \
+  &amp;&amp; terraform apply -target=module.argocd -target=module.cloudflared -auto-approve \
+  &amp;&amp; terraform apply -auto-approve</code></pre>
 
   <p>What goes wrong if you skip a stage:</p>
   <ul>
@@ -1343,20 +1360,50 @@ terraform destroy</code></pre>
     </table>
   </div>
 
-  <h3>15.1 — Install the CLIs (one-time per machine)</h3>
-<pre><code># WSL / Linux
-sudo apt update
-sudo apt install -y git jq curl
-sudo snap install google-cloud-cli --classic
-sudo snap install kubectl --classic
-# Terraform: HashiCorp APT repo (one-liner is on https://developer.hashicorp.com/terraform/install)
+  <h3>15.1 — Install the CLIs (one-time per machine, Ubuntu 22.04 / 24.04)</h3>
 
-# Windows (PowerShell as admin)
-winget install Git.Git
-winget install Docker.DockerDesktop
-winget install Google.CloudSDK
-winget install Hashicorp.Terraform
-winget install Kubernetes.kubectl</code></pre>
+  <p>One paste-and-run block that installs Git, jq, curl, Docker Engine, gcloud, Terraform, and kubectl using official apt repos:</p>
+<pre><code>set -euo pipefail
+
+# 1. Base utilities + Docker Engine
+sudo apt update
+sudo apt install -y git curl jq ca-certificates gnupg lsb-release apt-transport-https
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER"     # log out + back in after this for `docker` without sudo
+
+# 2. gcloud CLI (Google Cloud apt repo)
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+  | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+
+# 3. Terraform (HashiCorp apt repo)
+wget -qO- https://apt.releases.hashicorp.com/gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+  | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+# 4. kubectl (Kubernetes pkgs.k8s.io apt repo)
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' \
+  | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+# 5. Install everything from the new repos
+sudo apt update
+sudo apt install -y google-cloud-cli terraform kubectl
+
+# 6. Sanity check
+docker --version
+gcloud --version | head -1
+terraform version | head -1
+kubectl version --client | head -1
+jq --version</code></pre>
+
+  <div class="callout note">
+    <p><strong>Headless server?</strong> The <code>gcloud auth login</code> and <code>terraform login</code> commands in later steps want to open a browser. On a headless box, run them with <code>--no-browser</code> (gcloud) or follow the printed URL manually (terraform); both then accept a code you paste back.</p>
+  </div>
 
   <h3>15.2 — Clone the three repos</h3>
 <pre><code>mkdir -p prodx-workspace &amp;&amp; cd prodx-workspace
@@ -1431,6 +1478,12 @@ cp terraform.tfvars.example terraform.tfvars
 
 terraform init                                                              # ~30s
 
+# --- One-liner: all three stages, hands-off (~22 min) ---
+terraform apply -target=module.network -target=module.cluster -auto-approve \
+  &amp;&amp; terraform apply -target=module.argocd -target=module.cloudflared -auto-approve \
+  &amp;&amp; terraform apply -auto-approve
+
+# --- Or run the stages individually if you want to inspect between them ---
 # Stage 1: VPC + GKE cluster + node pool
 terraform apply -target=module.network -target=module.cluster -auto-approve # ~14 min
 
