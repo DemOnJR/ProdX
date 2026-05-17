@@ -857,6 +857,11 @@ git push</code></pre>
 
   <p>To enable both: GitHub repo → <strong>Settings → Code security</strong> → toggle on both "Dependabot security updates" and "Dependabot version updates". Free for public repos, built into GitHub (no third-party app to install). The version-updates toggle reads our <code>.github/dependabot.yml</code> for ecosystem + cooldown settings; the security-updates toggle has no config file — it's just on or off.</p>
 
+  <div class="callout warn">
+    <p><strong>Lockfiles are required for Dependabot security updates.</strong> If your repo doesn't commit a <code>package-lock.json</code> (npm), <code>poetry.lock</code> (poetry), <code>Pipfile.lock</code> (pipenv), or use hash-pinned <code>requirements.txt</code>, Dependabot doesn't know which exact version you're running. Security updates fail with <em>"Dependabot can't update vulnerable dependencies for projects without a lockfile or pinned version requirement."</em></p>
+    <p>This project commits <code>frontend/package-lock.json</code> and pins exact versions in <code>backend/requirements.txt</code> (e.g. <code>fastapi==0.136.1</code>) for exactly this reason. The lockfile also lets CI use <code>npm ci</code> (reproducible install from the lockfile) and turn on the <code>actions/setup-node</code> npm cache.</p>
+  </div>
+
   <h4>Layered defense — how the four security gates fit together</h4>
 
   <table>
