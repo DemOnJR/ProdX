@@ -128,15 +128,7 @@ jobs:
 
       - name: pytest
         id: pytest
-        run: pytest --junitxml=test-results.xml
-
-      - name: Upload test results
-        if: always() && steps.pytest.outcome != 'skipped'
-        uses: actions/upload-artifact@v7
-        with:
-          name: backend-test-results
-          path: backend/test-results.xml
-          retention-days: 14
+        run: pytest
 
       - name: Summary
         if: always()
