@@ -2,7 +2,13 @@ name: build-test-scan-push
 
 on:
   push:
-    branches: [main, dev]
+    # Only main pushes (and version tags) trigger the full pipeline.
+    # Dev branch pushes don't run CI on their own — they pile up on dev
+    # until a PR is opened against main, at which point the pull_request
+    # trigger below fires the pipeline once (and re-fires on each push
+    # to dev WHILE the PR is open, via the default `synchronize` event).
+    # Net effect: cheaper iteration on dev, same gating before merge.
+    branches: [main]
     tags: ['v*.*.*']
   pull_request:
     branches: [main]

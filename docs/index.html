@@ -779,7 +779,7 @@ docker compose up --build</code></pre>
   <ul>
     <li>On <strong>pull requests to <code>main</code></strong>: build + test + scan; no push to Docker Hub.</li>
     <li>On <strong>push to <code>main</code></strong>: pushes <code>:main</code>, <code>:latest</code>, and <code>:sha-xxxxxxx</code>.</li>
-    <li>On <strong>push to <code>dev</code></strong>: pushes <code>:dev</code> and <code>:sha-xxxxxxx</code>. <em>No</em> <code>:latest</code> tag — that's gated to the default branch only, so Argo CD never accidentally syncs dev code into the cluster.</li>
+    <li>On <strong>push to <code>dev</code></strong>: <em>no CI runs.</em> Dev pushes are cheap — they pile up on the branch until a PR is opened against main. (See "Branching model" below for the rationale.)</li>
     <li>On a <strong>tag <code>v1.2.3</code></strong>: pushes <code>:1.2.3</code> + the SHA tag too.</li>
   </ul>
 
@@ -791,7 +791,7 @@ docker compose up --build</code></pre>
     <thead><tr><th>Branch</th><th>Role</th><th>What ships from it</th></tr></thead>
     <tbody>
       <tr><td><code>main</code></td><td>Always deployable. Argo CD watches it; pushes here go live in the cluster within ~3 minutes.</td><td><code>:latest</code> + <code>:main</code> + <code>:sha-xxxxxxx</code> images</td></tr>
-      <tr><td><code>dev</code></td><td>Daily working branch. Push freely; CI runs every push (lint + tests + audit + build + scan), but Argo CD doesn't watch it so nothing deploys.</td><td><code>:dev</code> + <code>:sha-xxxxxxx</code> images (no <code>:latest</code>)</td></tr>
+      <tr><td><code>dev</code></td><td>Daily working branch. Push as often as you like — <strong>CI does not run on dev pushes</strong>. CI fires when you open a PR against <code>main</code> (and re-fires on subsequent pushes to dev while the PR is open).</td><td>Nothing pushed to Docker Hub from dev. Image gets built + scanned during PR checks but only published after merge to <code>main</code>.</td></tr>
     </tbody>
   </table>
 
