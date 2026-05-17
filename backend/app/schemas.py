@@ -24,5 +24,9 @@ class MetricsResponse(BaseModel):
     timestamp: datetime
     uptime_seconds: float
     service: str = "prodx-api"
+    # Bumped on every release. Useful smoke check after a Docker Hub
+    # republish + Argo CD sync: curl prodxapi.pbcv.dev/api/metrics
+    # and confirm the value here matches what you just merged.
+    version: str = "0.2.0"
     dependencies: dict[str, ServiceCheck]
     graph_count: int
