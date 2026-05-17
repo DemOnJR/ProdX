@@ -1,8 +1,8 @@
 name: CI · Frontend
 
-# Single-job pipeline for the React + Vite frontend. Mirrors ci-backend.yml.
-# See that file for the full rationale on the one-job shape and the skip-stub
-# / branch-protection arrangement.
+# Single-job pipeline for the React + Vite frontend service.
+# Mirrors ci-backend.yml. See that file for the full rationale on the
+# push-only path filter + always-run-on-PRs design.
 
 on:
   push:
@@ -13,10 +13,6 @@ on:
       - '.github/scripts/trivy-summary.py'
   pull_request:
     branches: [main]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/ci-frontend.yml'
-      - '.github/scripts/trivy-summary.py'
 
 env:
   IMAGE: europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-web
@@ -35,33 +31,40 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write   # for WIF on publish steps (gated to push events)
+      id-token: write
     defaults:
       run:
         working-directory: ./frontend
     steps:
-      # ─── Setup ──────────────────────────────────────────────────
-      - uses: actions/checkout@v6
+      - name: 📥 Checkout
+        uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v6
+      - name: 🟢 Set up Node 22
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - run: npm ci --no-audit --no-fund
+      - name: 📦 Install dependencies
+        run: npm ci --no-audit --no-fund
 
       # ─── Quality ────────────────────────────────────────────────
-      - run: npx tsc --noEmit
-      - run: npm run build
-      # --audit-level=critical: fail only on CRITICAL advisories
-      # (matches the Trivy image scan threshold).
-      - run: npm audit --audit-level=critical
+      - name: 🔍 TypeScript  ·  tsc --noEmit
+        run: npx tsc --noEmit
+
+      - name: 🔨 Vite build (production)
+        run: npm run build
+
+      - name: 🔐 Audit  ·  npm audit (CRITICAL threshold)
+        run: npm audit --audit-level=critical
 
       # ─── Build + Trivy scan ─────────────────────────────────────
-      - uses: docker/setup-buildx-action@v4
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
-      - uses: docker/build-push-action@v7
+      - name: 🔨 Build image (local, populate cache for Publish)
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
@@ -70,7 +73,8 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - name: 🛡️ Scan image  ·  Trivy (JSON, all severities)
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.LOCAL_TAG }}
           exit-code: '0'
@@ -78,21 +82,24 @@ jobs:
           vuln-type: 'os,library'
           output: frontend-trivy.json
 
-      - name: Parse Trivy + write summary + apply CRITICAL+fixed gate
+      - name: 📊 Trivy summary + CRITICAL-with-fix gate
         working-directory: ${{ github.workspace }}
         run: python3 .github/scripts/trivy-summary.py frontend-trivy.json ${{ env.IMAGE }}:ci-scan
 
       # ─── Publish (main push only) ───────────────────────────────
-      - if: github.event_name != 'pull_request'
+      - name: 🔑 Auth to GCP  ·  Workload Identity Federation
+        if: github.event_name != 'pull_request'
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
           service_account: ${{ env.GCP_WIF_SA }}
 
-      - if: github.event_name != 'pull_request'
+      - name: 🐳 Configure docker for GAR
+        if: github.event_name != 'pull_request'
         run: gcloud auth configure-docker ${{ env.GAR_HOST }} --quiet
 
-      - if: github.event_name != 'pull_request'
+      - name: 🏷️ Compute image tags
+        if: github.event_name != 'pull_request'
         id: meta
         uses: docker/metadata-action@v6
         with:
@@ -103,7 +110,8 @@ jobs:
             type=sha,format=short
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - if: github.event_name != 'pull_request'
+      - name: 🚢 Push to Artifact Registry
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: ./frontend

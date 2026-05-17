@@ -1,20 +1,17 @@
 name: CI · Backend
 
-# Single-job pipeline for the FastAPI backend. Runs sequentially:
-#   install deps → ruff → pytest → pip-audit → build image → Trivy → (push to GAR if main)
+# Single-job pipeline for the FastAPI backend service.
 #
-# Why one job:
-#   - Compact file: ~80 lines vs ~280 for the per-phase / matrix shapes.
-#   - All steps share one runner: no checkout / setup-python / install
-#     repetition, no artifact roundtrip between Build and Scan.
-#   - Sequential is a deliberate trade: we lose parallelism between the 3
-#     Quality checks (~30s slower per push), gain a much smaller file.
+# Path filter on PUSH only:
+#   - Push to main with no backend/** changes → workflow doesn't run
+#     (only the changed service republishes its image to GAR).
+#   - PR to main → always runs (no PR path filter), so the required
+#     "🛡️ Backend · Scan image" branch-protection check is always posted.
+#     ~2 minutes of "wasted" CI on a frontend-only PR is the price of
+#     not needing a separate skip-stub workflow file.
 #
-# Branch protection:
-#   - The job's `name:` is "🛡️ Backend · Scan image" so the existing
-#     required-check rule keeps matching unchanged.
-#   - When this workflow doesn't run (path filter misses), ci-backend-skip.yml
-#     posts a synthetic success for the same name so PRs aren't blocked.
+# Branch protection: job name "🛡️ Backend · Scan image" matches the
+# required-checks rule on `main`.
 
 on:
   push:
@@ -25,27 +22,20 @@ on:
       - '.github/scripts/trivy-summary.py'
   pull_request:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/ci-backend.yml'
-      - '.github/scripts/trivy-summary.py'
 
 env:
-  # GAR repo + WIF wiring from ProdXTF's `terraform output`.
+  # GAR repo + WIF wiring (from ProdXTF: `terraform output`).
   # NOT secrets — security is enforced server-side by the WIF provider's
-  # attribute_condition (repository == "DemOnJR/ProdX"). Trust chain:
-  # ProdXTF/modules/registry/main.tf.
+  # attribute_condition. See ProdXTF/modules/registry/main.tf.
   IMAGE: europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-api
   GAR_HOST: europe-west3-docker.pkg.dev
   GCP_WIF_PROVIDER: projects/328683980484/locations/global/workloadIdentityPools/github-pool/providers/github-provider
   GCP_WIF_SA: gha-prodx-publisher@prodx-dev2.iam.gserviceaccount.com
-  LOCAL_TAG: prodx-api:ci-scan   # local-only docker tag, never pushed
+  LOCAL_TAG: prodx-api:ci-scan     # local-only docker tag; never pushed
 
-  # Opt-in to Node 24 for JS actions (Node 20 deprecation).
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  # Suppress docker/build-push-action's default artifact uploads.
-  DOCKER_BUILD_RECORD_UPLOAD: "false"
-  DOCKER_BUILD_SUMMARY: "false"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"   # opt-in to Node 24 for JS actions
+  DOCKER_BUILD_RECORD_UPLOAD: "false"          # no .dockerbuild artifacts
+  DOCKER_BUILD_SUMMARY: "false"                # no buildx summary table
 
 jobs:
   ci:
@@ -53,67 +43,75 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # id-token: write lets the runner request its OIDC token for WIF. Only
-      # the auth step below actually uses it, and that step is gated to push
-      # events — PR runs never produce a usable token.
-      id-token: write
+      id-token: write   # for WIF on publish steps (gated to push events)
     defaults:
       run:
         working-directory: ./backend
     steps:
-      # ─── Setup ──────────────────────────────────────────────────
-      - uses: actions/checkout@v6
+      - name: 📥 Checkout
+        uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v6
+      - name: 🐍 Set up Python 3.12
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
 
-      - run: pip install -r requirements-dev.txt
+      - name: 📦 Install dev dependencies
+        run: pip install -r requirements-dev.txt
 
       # ─── Quality ────────────────────────────────────────────────
-      - run: ruff check app/ tests/
-      - run: pytest
-      - run: pip-audit -r requirements.txt
+      - name: 🔍 Lint  ·  ruff
+        run: ruff check app/ tests/
+
+      - name: 🧪 Test  ·  pytest
+        run: pytest
+
+      - name: 🔐 Audit  ·  pip-audit
+        run: pip-audit -r requirements.txt
 
       # ─── Build + Trivy scan ─────────────────────────────────────
-      - uses: docker/setup-buildx-action@v4
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
-      - uses: docker/build-push-action@v7
+      - name: 🔨 Build image (local, populate cache for Publish)
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          load: true                       # load into local docker for Trivy
+          load: true
           tags: ${{ env.LOCAL_TAG }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - name: 🛡️ Scan image  ·  Trivy (JSON, all severities)
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.LOCAL_TAG }}
-          exit-code: '0'                   # never fail the action — gating happens below
+          exit-code: '0'                       # gating happens in the next step
           format: json
           vuln-type: 'os,library'
           output: backend-trivy.json
 
-      - name: Parse Trivy + write summary + apply CRITICAL+fixed gate
+      - name: 📊 Trivy summary + CRITICAL-with-fix gate
         working-directory: ${{ github.workspace }}
         run: python3 .github/scripts/trivy-summary.py backend-trivy.json ${{ env.IMAGE }}:ci-scan
 
       # ─── Publish (main push only) ───────────────────────────────
-      # Each step below is gated on `github.event_name != 'pull_request'`,
-      # so the PR pipeline stops at "Trivy scan + gate" — same as before.
-      - if: github.event_name != 'pull_request'
+      - name: 🔑 Auth to GCP  ·  Workload Identity Federation
+        if: github.event_name != 'pull_request'
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
           service_account: ${{ env.GCP_WIF_SA }}
 
-      - if: github.event_name != 'pull_request'
+      - name: 🐳 Configure docker for GAR
+        if: github.event_name != 'pull_request'
         run: gcloud auth configure-docker ${{ env.GAR_HOST }} --quiet
 
-      - if: github.event_name != 'pull_request'
+      - name: 🏷️ Compute image tags
+        if: github.event_name != 'pull_request'
         id: meta
         uses: docker/metadata-action@v6
         with:
@@ -124,7 +122,8 @@ jobs:
             type=sha,format=short
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - if: github.event_name != 'pull_request'
+      - name: 🚢 Push to Artifact Registry
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: ./backend
@@ -132,4 +131,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=backend    # reuse layers built above
+          cache-from: type=gha,scope=backend
