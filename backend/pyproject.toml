@@ -17,7 +17,17 @@ ignore = [
 # Without this, ruff treats `app.*` as third-party and complains about the
 # blank line separating it from stdlib/third-party imports (I001).
 known-first-party = ["app"]
+# Default isort splits aliased imports into their own `from X import (...)`
+# block per alias — so `from app.cache import (get_client, get_graph as cache_get)`
+# gets split into two separate blocks. Ugly. `combine-as-imports = true`
+# tells isort to keep aliased imports alongside their siblings in the same
+# block, which is what every reasonable Python codebase wants.
+combine-as-imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+# Without this, `from app.main import app` fails because pytest doesn't
+# auto-add the rootdir to sys.path in modern versions. Equivalent to
+# running `PYTHONPATH=. pytest`.
+pythonpath = ["."]
