@@ -23,7 +23,12 @@ on:
       - '.github/scripts/trivy-summary.py'
   pull_request:
     branches: [main]
-    # No paths: filter — see ci-backend.yml header for why.
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+      - '.github/scripts/trivy-summary.py'
+    # The same "real or skip stub" pattern as backend — see
+    # ci-frontend-skip.yml for the other half.
 
 env:
   # ─── Google Artifact Registry — private Docker repo on GCP ──────────

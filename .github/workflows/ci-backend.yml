@@ -19,13 +19,14 @@ name: CI · Backend
 #   - Independent publish: backend image is republished on backend changes
 #     only. Frontend image stays exactly as-is — same digest, same tag.
 #
-# Path filter on PUSH only (not PR):
-#   - Pushes to main with no backend/** changes skip the whole pipeline.
-#   - PRs always run regardless of which paths changed, so branch protection
-#     status checks stay stable. (If we path-filtered PRs too, a frontend-
-#     only PR would never produce a "🛡️ Backend · Scan image" status, and
-#     branch protection would block the merge waiting for a check that
-#     will never appear.)
+# Path filter on BOTH push and PR:
+#   - Only runs when backend/**, this workflow file, or the shared Trivy
+#     parser script changes.
+#   - Branch-protection status check "🛡️ Backend · Scan image" is still
+#     required on every PR — but when this workflow doesn't run, the
+#     ci-backend-skip.yml stub posts a synthetic success for the same
+#     check name. So a frontend-only PR is unblocked without doing any
+#     real backend work. See ci-backend-skip.yml for the other half.
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -37,8 +38,10 @@ on:
       - '.github/scripts/trivy-summary.py'
   pull_request:
     branches: [main]
-    # No paths: filter — PR always runs the full pipeline, regardless of
-    # what changed. See header comment for why.
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+      - '.github/scripts/trivy-summary.py'
 
 env:
   # ─── Google Artifact Registry — private Docker repo on GCP ──────────
