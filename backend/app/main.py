@@ -1,15 +1,14 @@
 import json
+import os
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import Session as OrmSession
-
-import os
 
 from app.cache import (
     get_client,
@@ -141,7 +140,7 @@ def metrics(request: Request, db: Session = Depends(get_session)) -> MetricsResp
 
     return MetricsResponse(
         status=status,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         uptime_seconds=round(uptime, 3),
         dependencies=deps,
         graph_count=graph_count,

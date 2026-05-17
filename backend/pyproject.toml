@@ -3,10 +3,14 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-# Pragmatic defaults — pyflakes + pycodestyle errors + isort + bugbear.
+# Pragmatic defaults — pyflakes + pycodestyle errors + isort + bugbear + pyupgrade.
 select = ["E", "F", "W", "I", "B", "UP"]
 ignore = [
   "E501",   # long lines (handled by formatter when we want)
+  "B008",   # `Depends(...)` as default arg IS the idiomatic FastAPI pattern;
+            # see https://fastapi.tiangolo.com/tutorial/dependencies/ — ruff's
+            # bugbear rule doesn't know about FastAPI and false-flags every
+            # router endpoint that uses dependency injection.
 ]
 
 [tool.pytest.ini_options]
