@@ -748,12 +748,38 @@ docker compose up --build</code></pre>
   </table>
 
   <h3>How the workflow behaves</h3>
-  <p>The workflow at <code>.github/workflows/docker-publish.yml</code>:</p>
+  <p>The workflow at <code>.github/workflows/docker-publish.yml</code> runs <strong>two parallel jobs</strong> — one per service — so the Actions UI shows them side-by-side and a failure in one doesn't mask the other. Each job is a real CI pipeline (build → test → scan → push), not just <code>docker build</code>.</p>
+
+  <table>
+    <thead>
+      <tr><th>Stage</th><th>Backend · FastAPI</th><th>Frontend · React + Vite</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>1. Checkout</strong></td><td><code>actions/checkout@v4</code></td><td><code>actions/checkout@v4</code></td></tr>
+      <tr><td><strong>2. Toolchain</strong></td><td>Set up Python 3.12 + pip cache</td><td>Set up Node 22 + npm cache</td></tr>
+      <tr><td><strong>3. Install deps</strong></td><td><code>pip install -r requirements-dev.txt</code></td><td><code>npm ci</code> (falls back to <code>npm install</code> if no lockfile)</td></tr>
+      <tr><td><strong>4. Lint / type check</strong></td><td><code>ruff check app/ tests/</code></td><td><code>npx tsc --noEmit</code></td></tr>
+      <tr><td><strong>5. Tests / build</strong></td><td><code>pytest</code> (smoke tests)</td><td><code>npm run build</code> (vite production build)</td></tr>
+      <tr><td><strong>6. Image build</strong></td><td>Buildx with GHA cache</td><td>Buildx with GHA cache</td></tr>
+      <tr><td><strong>7. Trivy scan</strong></td><td>fails on CRITICAL + fixed-only</td><td>fails on CRITICAL + fixed-only</td></tr>
+      <tr><td><strong>8. Push to Docker Hub</strong></td><td>only on push to <code>main</code> / tags</td><td>only on push to <code>main</code> / tags</td></tr>
+      <tr><td><strong>9. Step summary</strong></td><td>markdown summary in the Actions UI</td><td>markdown summary in the Actions UI</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Trivy: scanning for known CVEs before publishing</h4>
+  <p>Step 7 runs <a href="https://github.com/aquasecurity/trivy"><code>trivy image</code></a> on the freshly-built image and fails the job if it finds a <strong>CRITICAL</strong> CVE with a known fix (<code>ignore-unfixed: true</code>). Severity threshold is a deliberate trade-off:</p>
   <ul>
-    <li>builds <strong>both</strong> Dockerfiles in parallel via Buildx with GitHub Actions cache;</li>
-    <li>on <strong>pull requests</strong>: builds only, doesn't push;</li>
-    <li>on <strong>push to <code>main</code></strong>: pushes <code>:main</code>, <code>:latest</code>, and <code>:sha-xxxxxxx</code>;</li>
-    <li>on a <strong>tag <code>v1.2.3</code></strong>: pushes <code>:1.2.3</code> + the SHA tag too.</li>
+    <li><strong>CRITICAL only</strong> — the actionable signal. If it fires, you can almost always fix it by bumping a base image or a library.</li>
+    <li><strong>fixed-only</strong> — drops CVEs that have no patch available yet. These would otherwise keep the build red forever with nothing you can do about it, training the team to ignore alerts. The unfixed ones are still <em>reported</em> in the scan output for awareness.</li>
+  </ul>
+  <p>To tighten later: edit <code>.github/workflows/docker-publish.yml</code> and change <code>severity: CRITICAL</code> to <code>severity: HIGH,CRITICAL</code>. To loosen for a known-tolerable issue: add a <code>.trivyignore</code> file with the CVE ID.</p>
+
+  <h4>Triggers + tags</h4>
+  <ul>
+    <li>On <strong>pull requests</strong>: build + test + scan, no push.</li>
+    <li>On <strong>push to <code>main</code></strong>: pushes <code>:main</code>, <code>:latest</code>, and <code>:sha-xxxxxxx</code>.</li>
+    <li>On a <strong>tag <code>v1.2.3</code></strong>: pushes <code>:1.2.3</code> + the SHA tag too.</li>
   </ul>
 
   <p>Trigger the first run by pushing anything (or just an empty commit):</p>
@@ -765,6 +791,36 @@ git push</code></pre>
     <li><code>https://hub.docker.com/r/pbdaemon/prodx-api</code></li>
     <li><code>https://hub.docker.com/r/pbdaemon/prodx-web</code></li>
   </ul>
+
+  <h3>Dependency freshness: 7-day cooldown via Dependabot</h3>
+  <p>Supply-chain attacks on package registries (npm, PyPI, Docker Hub) have become routine — a compromised maintainer publishes a backdoored version of a popular library, and apps that auto-update overnight get owned before anyone notices. The community usually catches these within 24–48 hours and the bad version is yanked.</p>
+
+  <p>The defense is simple: <strong>don't adopt brand-new versions</strong>. The repo's <code>.github/dependabot.yml</code> configures Dependabot to delay every version-update PR by 7 days after release:</p>
+
+<pre><code>updates:
+  - package-ecosystem: "pip"        # backend/requirements*.txt
+    directory: "/backend"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
+  - package-ecosystem: "npm"        # frontend/package.json
+    directory: "/frontend"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
+  - package-ecosystem: "docker"     # base images (FROM ...)
+    directory: "/backend"
+    cooldown: { default-days: 7 }
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    cooldown: { default-days: 7 }
+  - package-ecosystem: "github-actions"   # uses: actions/checkout@v4 etc.
+    directory: "/"
+    cooldown: { default-days: 7 }</code></pre>
+
+  <div class="callout ok">
+    <p><strong>Security advisories bypass cooldown.</strong> When GitHub publishes a CVE for a package you depend on, Dependabot opens the fix PR <em>immediately</em> regardless of the 7-day setting. Cooldown only applies to routine version bumps, not to "your current pinned version has a known exploit, upgrade now" notifications.</p>
+  </div>
+
+  <p>To enable: GitHub repo → Settings → Code security → enable Dependabot version updates and Dependabot security updates. Dependabot is free for public repos and built into GitHub (no third-party app to install).</p>
 </section>
 
 <section id="identity">
@@ -1102,6 +1158,58 @@ terraform apply</code></pre>
 
   <div class="callout note">
     <p><strong>Why the staged dance only on the first run?</strong> After the cluster + helm release exist, every provider can introspect what it needs at plan time and one pass suffices. The chicken-and-eggs are purely a bootstrap concern — they don't recur.</p>
+  </div>
+
+  <h3>What "prod" would look like</h3>
+
+  <p>The split between <code>envs/dev</code> and the (hypothetical) <code>envs/prod</code> is the canonical Terraform pattern for multiple deployment environments: <strong>same modules, different variable values, different state files</strong>. We currently ship just the dev env because a single-developer capstone doesn't need more, but the directory structure makes adding prod a copy-and-tune exercise — no module changes required.</p>
+
+  <p>Concrete shape, if you ever scale up:</p>
+
+<pre><code>ProdXTF/
+├── envs/
+│   ├── bootstrap/      (run once — creates the GCP project)
+│   ├── dev/            (cheap, small, ephemeral; what we have)
+│   ├── staging/        (optional — mirror of prod for pre-merge checks)
+│   └── prod/           (the real one — customer-facing)
+└── modules/            (SAME modules used by every env)
+    ├── network/
+    ├── cluster/
+    ├── argocd/
+    └── cloudflared/</code></pre>
+
+  <p>Each env reads the same <code>modules/</code> but with different variable values:</p>
+
+  <table>
+    <thead><tr><th>Setting</th><th>dev (what we ship)</th><th>prod (illustrative)</th></tr></thead>
+    <tbody>
+      <tr><td><code>cluster_machine_type</code></td><td><code>e2-small</code> (2 vCPU shared, 2 GB)</td><td><code>n2-standard-4</code> (4 vCPU, 16 GB)</td></tr>
+      <tr><td><code>cluster_use_spot</code></td><td><code>true</code> (~70% cheaper, preemptible)</td><td><code>false</code> (stable nodes)</td></tr>
+      <tr><td><code>cluster_min_nodes</code></td><td>1</td><td>3 (HA across zones)</td></tr>
+      <tr><td><code>cluster_max_nodes</code></td><td>3</td><td>20</td></tr>
+      <tr><td>Cluster type</td><td>Zonal (cheaper control plane)</td><td>Regional (HA control plane)</td></tr>
+      <tr><td>HCP TF workspace</td><td><code>prodx-dev</code></td><td><code>prodx-prod</code> (separate state)</td></tr>
+      <tr><td>Cloudflare hostnames</td><td><code>prodx.pbcv.dev</code> etc.</td><td><code>app.pbcv.dev</code> / <code>api.pbcv.dev</code> on a separate tunnel</td></tr>
+      <tr><td>Postgres password</td><td>plaintext in values.yaml</td><td>External Secrets Operator → HashiCorp Vault</td></tr>
+      <tr><td>Image tags Argo deploys</td><td><code>:latest</code> + <code>pullPolicy: Always</code></td><td>pinned <code>:v1.2.3</code> tags; bumped by promotion PR</td></tr>
+      <tr><td>Approval to apply</td><td>any time, from your laptop</td><td>VCS-driven Remote in HCP, PR review required</td></tr>
+    </tbody>
+  </table>
+
+  <p>Adding a prod env is roughly:</p>
+  <ol>
+    <li><code>cp -r envs/dev envs/prod</code></li>
+    <li>Edit <code>envs/prod/versions.tf</code> → workspace <code>prodx-prod</code></li>
+    <li>Edit <code>envs/prod/terraform.tfvars</code> → the overrides above</li>
+    <li>Create the <code>prodx-prod</code> workspace in HCP Terraform (Local exec, or Remote with a service-account credential for VCS-driven applies)</li>
+    <li>Create a second Cloudflare tunnel for prod hostnames; paste its token into <code>envs/prod/terraform.tfvars</code></li>
+    <li>Run the same three-stage apply you did for dev</li>
+  </ol>
+
+  <p>The bootstrap env stays unchanged — both dev and prod live in the <em>same</em> GCP project. If you wanted full GCP-level isolation (prod in its own project), you'd duplicate the bootstrap too: <code>envs/bootstrap-dev</code> + <code>envs/bootstrap-prod</code>, each pointing at a different <code>project_id</code>.</p>
+
+  <div class="callout note">
+    <p>This section is documentation only — no <code>envs/prod/</code> directory exists in the repo today. The intent is to show how the dev-only setup scales without rewrites, not to ship dead code.</p>
   </div>
 </section>
 

@@ -1,0 +1,74 @@
+# Dependabot keeps dependencies fresh AND safe. The `cooldown` block delays
+# version-update PRs by 7 days so a brand-new malicious/broken release has
+# time to be detected and yanked by the community before we adopt it.
+#
+# This catches the common supply-chain attack vector where a compromised
+# maintainer publishes a backdoored 1-day-old version of a popular package
+# (recent npm + PyPI incidents have all been caught within ~48h).
+#
+# Security advisories (CVEs with known exploits) bypass cooldown and PR
+# immediately — see https://docs.github.com/en/code-security/dependabot
+
+version: 2
+
+updates:
+  # Backend Python deps
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    labels:
+      - "deps"
+      - "backend"
+
+  # Frontend Node deps
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    labels:
+      - "deps"
+      - "frontend"
+
+  # Base images (postgres, redis pinned in compose/charts get updated via PRs)
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    labels:
+      - "deps"
+      - "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    labels:
+      - "deps"
+      - "docker"
+
+  # GitHub Actions versions (actions/checkout, docker/build-push-action, etc.)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    labels:
+      - "deps"
+      - "ci"

@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Pragmatic defaults — pyflakes + pycodestyle errors + isort + bugbear.
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+  "E501",   # long lines (handled by formatter when we want)
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

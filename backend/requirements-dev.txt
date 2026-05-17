@@ -1,0 +1,6 @@
+# Dev/CI dependencies. Not installed in the production image (Dockerfile only
+# copies requirements.txt). Used by the GitHub Actions backend job for lint + tests.
+-r requirements.txt
+ruff==0.7.4
+pytest==8.3.4
+httpx==0.27.2

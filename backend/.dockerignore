@@ -3,3 +3,8 @@ __pycache__/
 .venv/
 .env
 .env.*
+tests/
+pyproject.toml
+requirements-dev.txt
+.pytest_cache/
+.ruff_cache/
