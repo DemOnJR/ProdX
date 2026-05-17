@@ -821,6 +821,61 @@ docker compose up --build</code></pre>
     <p>For Dependabot PRs, the same gates apply automatically — they can't auto-merge until CI passes. Combined with the cooldown + security update bypass already configured, this is the full automated update flow.</p>
   </div>
 
+  <h4>Repo-wide merge settings — squash-only</h4>
+
+  <p>Branch protection forces PRs to be the only way into <code>main</code>, but it doesn't control <em>how</em> the merge button behaves. Without the next setting, every PR merge creates a "merge commit" on <code>main</code> that <code>dev</code> doesn't have — so <code>dev</code> is "1 commit behind <code>main</code>" immediately after every merge, forever. The fix is to disable the merge-commit option entirely:</p>
+
+  <ol>
+    <li>Open <code>https://github.com/&lt;you&gt;/ProdX/settings</code> (just the main settings page, not Branches).</li>
+    <li>Scroll to the <strong>Pull Requests</strong> section.</li>
+    <li>Set the three "Allow ..." checkboxes so only Squash is on:
+      <ul>
+        <li>⬜ <strong>Allow merge commits</strong> — uncheck. This is the one that causes the drift.</li>
+        <li>✅ <strong>Allow squash merging</strong> — keep checked. Default merge-button behavior becomes "Squash and merge".</li>
+        <li>⬜ <strong>Allow rebase merging</strong> — uncheck (optional; keeps history strictly linear).</li>
+      </ul>
+    </li>
+    <li>Optional, but recommended:
+      <ul>
+        <li>✅ <strong>Always suggest updating pull request branches</strong> — surfaces the "Update branch" button when PR is behind <code>main</code>.</li>
+        <li>✅ <strong>Automatically delete head branches</strong> — Dependabot branches and one-off feature branches clean themselves up after merge.</li>
+      </ul>
+    </li>
+    <li>Settings save automatically; no submit button.</li>
+  </ol>
+
+  <p>What this looks like before vs after:</p>
+
+  <div class="diagram">
+<pre>BEFORE (merge commits enabled)               AFTER (squash-only)
+─────────────────────────────                 ─────────────────────────────
+
+main:  …──●──●──M     ← merge commit          main:  …──●──●──C   ← squashed diff
+              ╱       (a new commit            commit                (one new commit
+dev:   …──●──●        only main has)          dev:   …──●──●         that contains
+       └── 1 behind ──┘                              └── 1 behind ──┘  dev's changes —
+       (forever, or until you sync)                  (but content-equal,
+                                                      so `git fetch && git
+                                                      reset --hard origin/main`
+                                                      from dev is a no-op
+                                                      fast-forward)</pre>
+  </div>
+
+  <h4>If <code>dev</code> drifts anyway — the reset trick</h4>
+
+  <p>If you've already accumulated drift (e.g. from earlier merges with the default settings), reset <code>dev</code> to match <code>main</code> exactly. Safe because <code>dev</code> doesn't have anything <code>main</code> doesn't already have (the PR merge already brought everything across):</p>
+
+<pre><code>git checkout dev
+git fetch
+git reset --hard origin/main
+git push --force-with-lease origin dev    # --force-with-lease aborts if someone else pushed first</code></pre>
+
+  <p>Zero divergence after. Confirm with:</p>
+
+<pre><code>git fetch
+git log --oneline origin/main..origin/dev    # should be empty (dev has nothing main lacks)
+git log --oneline origin/dev..origin/main    # should be empty (main has nothing dev lacks)</code></pre>
+
   <p>Trigger the first run by pushing anything (or just an empty commit):</p>
 <pre><code>git commit --allow-empty -m "trigger CI"
 git push</code></pre>
