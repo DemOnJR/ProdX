@@ -14,9 +14,24 @@ on:
     branches: [main]
 
 env:
+  # ─── Docker Hub (legacy — being phased out in Stage 4 of the GAR migration)
   REGISTRY: docker.io
   API_IMAGE: pbdaemon/prodx-api
   WEB_IMAGE: pbdaemon/prodx-web
+
+  # ─── Google Artifact Registry (the new home — private, no static secrets)
+  # Each release goes to BOTH registries during the cutover so we can flip
+  # the Helm chart safely. Values come from ProdXTF's `terraform output`:
+  #   GAR_REGISTRY  ← registry_url                       (split host/path)
+  #   GCP_WIF_*     ← wif_provider_for_workflow / wif_service_account_for_workflow
+  # Not secrets — security is enforced server-side by the WIF provider's
+  # attribute_condition (must equal "DemOnJR/ProdX"), not by hiding URLs.
+  GAR_REGISTRY: europe-west3-docker.pkg.dev
+  GAR_API_IMAGE: europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-api
+  GAR_WEB_IMAGE: europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-web
+  GCP_WIF_PROVIDER: projects/328683980484/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+  GCP_WIF_SA: gha-prodx-publisher@prodx-dev2.iam.gserviceaccount.com
+
   # Opt every JavaScript action into Node.js 24 immediately. Without this,
   # GitHub prints a deprecation warning per Node-20 action invocation; from
   # June 2 2026 it'll force Node 24 anyway; Node 20 is removed Sept 16 2026.
@@ -499,7 +514,7 @@ jobs:
   # ════════════════════════════════════════════════════════════════════
 
   publish:
-    name: 🚢 Publish to Docker Hub
+    name: 🚢 Publish (Docker Hub + GAR)
     runs-on: ubuntu-latest
     # Only the two leaf jobs — backend-scan and frontend-scan transitively
     # depend on every upstream phase (their `needs:` chains back through
@@ -511,6 +526,11 @@ jobs:
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
+      # id-token: write is required for the runner to request its short-lived
+      # OIDC token from GitHub's issuer. GCP's WIF provider exchanges that
+      # JWT for a 1-hour access token — no long-lived GCP_SA_KEY ever exists.
+      # See ProdXTF/modules/registry/main.tf for the full trust chain.
+      id-token: write
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
@@ -518,19 +538,44 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # ─── Auth: Docker Hub (static token) ─────────────────────────
       - name: Log in to Docker Hub
-        id: login
+        id: login-dockerhub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # ─── Auth: Google Artifact Registry (OIDC, no static secret) ──
+      # google-github-actions/auth trades the GitHub OIDC JWT for a GCP
+      # access token. GCP's Workload Identity Provider only mints one if
+      # the JWT's `repository` claim equals "DemOnJR/ProdX" — fork PRs and
+      # any random workflow elsewhere on github.com are rejected at this
+      # step with a "permission denied on attribute condition" error.
+      - name: Auth to Google Cloud (Workload Identity Federation)
+        id: auth-gcp
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
+          service_account: ${{ env.GCP_WIF_SA }}
+
+      # Wires `gcloud` as the docker credential helper for the GAR host
+      # so `docker push europe-west3-docker.pkg.dev/...` uses the
+      # short-lived OIDC-derived token from the step above.
+      - name: Configure docker for GAR
+        run: gcloud auth configure-docker ${{ env.GAR_REGISTRY }} --quiet
+
       # ─── Backend image ───────────────────────────────────────────
+      # metadata-action understands multiple `images:` — each tag rule
+      # below is applied to BOTH registries, so one `docker push` round
+      # publishes the same digest to Docker Hub AND GAR. Atomic, idempotent.
       - name: Compute backend image tags
         id: meta-api
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.API_IMAGE }}
+          images: |
+            ${{ env.API_IMAGE }}
+            ${{ env.GAR_API_IMAGE }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -555,7 +600,9 @@ jobs:
         id: meta-web
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.WEB_IMAGE }}
+          images: |
+            ${{ env.WEB_IMAGE }}
+            ${{ env.GAR_WEB_IMAGE }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -581,12 +628,19 @@ jobs:
             echo "## 🚢 Publish complete"
             echo ""
             echo "Both pipelines passed Lint + Tests + Audit + Build + Scan."
-            echo "Images pushed:"
+            echo "Each image published to **two registries** in a single push:"
             echo ""
-            echo "| Image | Push |"
-            echo "|-------|------|"
-            echo "| \`${{ env.API_IMAGE }}\` | ${{ steps.push-api.outcome }} |"
-            echo "| \`${{ env.WEB_IMAGE }}\` | ${{ steps.push-web.outcome }} |"
+            echo "| Image | Docker Hub | Google Artifact Registry |"
+            echo "|-------|------------|--------------------------|"
+            echo "| backend | \`${{ env.API_IMAGE }}\` | \`${{ env.GAR_API_IMAGE }}\` |"
+            echo "| frontend | \`${{ env.WEB_IMAGE }}\` | \`${{ env.GAR_WEB_IMAGE }}\` |"
+            echo ""
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| Docker Hub login | ${{ steps.login-dockerhub.outcome }} |"
+            echo "| GCP auth (WIF, no static key) | ${{ steps.auth-gcp.outcome }} |"
+            echo "| Push backend (both registries) | ${{ steps.push-api.outcome }} |"
+            echo "| Push frontend (both registries) | ${{ steps.push-web.outcome }} |"
             echo ""
             echo "Per-phase results visible in each job's own summary above."
           } >> "$GITHUB_STEP_SUMMARY"
