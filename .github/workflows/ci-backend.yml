@@ -1,0 +1,379 @@
+name: CI · Backend
+
+# ─────────────────────────────────────────────────────────────────────────────
+#                              WHY THIS FILE EXISTS
+# ─────────────────────────────────────────────────────────────────────────────
+# Self-contained CI lifecycle for the FastAPI backend service. Owns:
+#
+#     [🔍 Lint] ─┐
+#     [🧪 Tests] ├──► [🔨 Build image] ──► [🛡️ Scan image] ──► [🚢 Publish]
+#     [🔐 Audit]─┘                                              (main push only)
+#
+# Why split from the frontend workflow:
+#   - Independent failure domains: a frontend regression doesn't block a
+#     backend hotfix and vice versa.
+#   - Faster pushes: changing only backend/ skips ALL frontend jobs entirely
+#     (no setup-node, no npm install, no vite build).
+#   - Smaller files: ~250 lines of one service end-to-end beats 600+ lines
+#     of two services interleaved.
+#   - Independent publish: backend image is republished on backend changes
+#     only. Frontend image stays exactly as-is — same digest, same tag.
+#
+# Path filter on PUSH only (not PR):
+#   - Pushes to main with no backend/** changes skip the whole pipeline.
+#   - PRs always run regardless of which paths changed, so branch protection
+#     status checks stay stable. (If we path-filtered PRs too, a frontend-
+#     only PR would never produce a "🛡️ Backend · Scan image" status, and
+#     branch protection would block the merge waiting for a check that
+#     will never appear.)
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+      - '.github/scripts/trivy-summary.py'
+  pull_request:
+    branches: [main]
+    # No paths: filter — PR always runs the full pipeline, regardless of
+    # what changed. See header comment for why.
+
+env:
+  # ─── Google Artifact Registry — private Docker repo on GCP ──────────
+  # Values come from ProdXTF: `terraform output -raw <name>` in envs/dev.
+  # NOT secrets — security is enforced server-side by the WIF provider's
+  # attribute_condition (must equal "DemOnJR/ProdX"). Anyone reading this
+  # file still can't push: their OIDC token won't carry the right claim.
+  # Trust chain: ProdXTF/modules/registry/main.tf
+  IMAGE: europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-api
+  GAR_HOST: europe-west3-docker.pkg.dev
+  GCP_WIF_PROVIDER: projects/328683980484/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+  GCP_WIF_SA: gha-prodx-publisher@prodx-dev2.iam.gserviceaccount.com
+
+  # Local-only tag used between Build and Scan jobs. Never gets pushed.
+  # Keeps the registry URL out of `docker save` / Trivy commands.
+  LOCAL_TAG: prodx-api:ci-scan
+
+  # Opt every JavaScript action into Node.js 24 immediately. Without this,
+  # GitHub prints a deprecation warning per Node-20 action invocation; from
+  # June 2 2026 it'll force Node 24 anyway; Node 20 is removed Sept 16 2026.
+  # See https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  # ════════════════════════════════════════════════════════════════════
+  # Quality — 3 jobs run in parallel
+  # ════════════════════════════════════════════════════════════════════
+
+  lint:
+    name: 🔍 Backend · Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: ruff check
+        id: ruff
+        run: ruff check app/ tests/
+
+      - name: Summary
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          {
+            echo "### 🔍 Backend · Lint"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| ruff check app/ tests/ | ${{ steps.ruff.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  tests:
+    name: 🧪 Backend · Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: pytest
+        id: pytest
+        run: pytest --junitxml=test-results.xml
+
+      - name: Upload test results
+        if: always() && steps.pytest.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-test-results
+          path: backend/test-results.xml
+          retention-days: 14
+
+      - name: Summary
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          {
+            echo "### 🧪 Backend · Tests"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| pytest (smoke) | ${{ steps.pytest.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  audit:
+    name: 🔐 Backend · Audit deps
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: pip-audit (runtime deps, full transitive tree)
+        id: audit
+        # Two runs: first writes JSON to a file for the artifact (|| true so
+        # the human-readable run still happens even on findings); second is
+        # the actual gate that fails the build on any known CVE in the
+        # requirements + their transitive deps.
+        run: |
+          pip-audit -r requirements.txt --format json --output audit.json || true
+          pip-audit -r requirements.txt
+
+      - name: Upload audit report
+        if: always() && steps.audit.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-deps-audit
+          path: backend/audit.json
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Summary
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          {
+            echo "### 🔐 Backend · Audit deps"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| pip-audit -r requirements.txt | ${{ steps.audit.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ════════════════════════════════════════════════════════════════════
+  # Build — only starts once all 3 Quality jobs pass
+  # ════════════════════════════════════════════════════════════════════
+
+  build:
+    name: 🔨 Backend · Build image
+    runs-on: ubuntu-latest
+    needs: [lint, tests, audit]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image (load locally + populate cache)
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          load: true
+          tags: ${{ env.LOCAL_TAG }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Save image as tarball
+        if: steps.build.outcome == 'success'
+        run: docker save ${{ env.LOCAL_TAG }} -o /tmp/backend-image.tar
+
+      - name: Upload image artifact (for Scan job)
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-image
+          path: /tmp/backend-image.tar
+          retention-days: 1
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### 🔨 Backend · Build image"
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| docker build (Buildx + GHA cache) | ${{ steps.build.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ════════════════════════════════════════════════════════════════════
+  # Scan — Trivy against the built image, CRITICAL+fixed gate
+  # ════════════════════════════════════════════════════════════════════
+
+  scan:
+    name: 🛡️ Backend · Scan image
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (for the parser script)
+        uses: actions/checkout@v6
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: backend-image
+          path: /tmp/
+
+      - name: Load image into local docker
+        run: docker load -i /tmp/backend-image.tar
+
+      # Trivy in INFORMATIONAL mode: scan everything, never fail the step
+      # itself. Gating + reporting happen in the next step against the JSON
+      # output, so the summary can show counts across ALL severities (not
+      # just the filtered CRITICAL ones the gating-only step would emit).
+      - name: Trivy scan (full, all severities, JSON)
+        id: scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.LOCAL_TAG }}
+          exit-code: '0'
+          format: json
+          vuln-type: 'os,library'
+          output: backend-trivy.json
+
+      - name: Parse Trivy + write rich summary + apply gate
+        id: gate
+        if: always() && steps.scan.outcome != 'skipped'
+        run: python3 .github/scripts/trivy-summary.py backend-trivy.json ${{ env.IMAGE }}:ci-scan
+
+      - name: Upload Trivy JSON report
+        if: always() && steps.scan.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-trivy-report
+          path: backend-trivy.json
+          retention-days: 14
+          if-no-files-found: warn
+
+  # ════════════════════════════════════════════════════════════════════
+  # Publish — only on main push, never on PRs
+  # ════════════════════════════════════════════════════════════════════
+
+  publish:
+    name: 🚢 Backend · Publish to GAR
+    runs-on: ubuntu-latest
+    needs: scan
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      # id-token: write is required for the runner to request its short-lived
+      # OIDC token from GitHub's issuer. GCP's WIF provider exchanges that
+      # JWT for a 1-hour access token — no long-lived GCP_SA_KEY ever exists.
+      # See ProdXTF/modules/registry/main.tf for the full trust chain.
+      id-token: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # ─── Auth: Workload Identity Federation (no static secret) ────
+      # google-github-actions/auth trades the GitHub OIDC JWT for a GCP
+      # access token. GCP's WIF provider only mints one if the JWT's
+      # `repository` claim equals "DemOnJR/ProdX" — fork PRs and any
+      # random workflow elsewhere on github.com are rejected at this
+      # step with a "permission denied on attribute condition" error.
+      - name: Auth to Google Cloud (Workload Identity Federation)
+        id: auth-gcp
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
+          service_account: ${{ env.GCP_WIF_SA }}
+
+      # Wires `gcloud` as the docker credential helper for the GAR host
+      # so `docker push europe-west3-docker.pkg.dev/...` uses the
+      # short-lived OIDC-derived token from the step above.
+      - name: Configure docker for GAR
+        run: gcloud auth configure-docker ${{ env.GAR_HOST }} --quiet
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build & push prodx-api
+        id: push
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Buildx cache populated by Build — this is essentially a
+          # tag-and-push from cached layers, not a real rebuild.
+          cache-from: type=gha,scope=backend
+
+      - name: Publish summary
+        if: always()
+        run: |
+          {
+            echo "### 🚢 Backend · Publish to GAR"
+            echo ""
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| GCP auth (WIF, no static key) | ${{ steps.auth-gcp.outcome }} |"
+            echo "| Push \`${{ env.IMAGE }}\` | ${{ steps.push.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
