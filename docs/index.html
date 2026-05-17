@@ -1067,21 +1067,29 @@ cloudflared_tunnel_token = "eyJh..."             # from step 9.2 (long JWT)</cod
 <pre><code>terraform init</code></pre>
   <p>Downloads the google, kubernetes, and helm providers and configures the HCP Terraform backend. Takes 20–60 seconds the first time.</p>
 
-  <h3>First apply (two stages)</h3>
-  <p>On a fresh state, the <code>kubernetes</code> and <code>helm</code> providers can't be configured until the cluster exists — chicken-and-egg. Do this once:</p>
-<pre><code>terraform apply -target=module.network -target=module.cluster
+  <h3>First apply (three stages on a fresh state)</h3>
+  <p>Two independent chicken-and-eggs on a fresh state — both verified the hard way by running <code>terraform destroy</code> followed by <code>terraform apply</code> end-to-end. The correct order is:</p>
+<pre><code># Stage 1 — VPC + GKE cluster + node pool (~14 min; control plane is the slow part)
+terraform apply -target=module.network -target=module.cluster
+
+# Stage 2a — Argo CD Helm release (installs the argoproj.io CRDs the next step
+# needs) + cloudflared Deployment (~8 min; helm wait + cloudflared image pull)
+terraform apply -target=module.argocd -target=module.cloudflared
+
+# Stage 2b — the root Argo CD Application that points at ProdXCD (~1 second:
+# just a CR creation; the actual workload sync happens inside Argo afterward)
 terraform apply</code></pre>
 
-  <p>Total time:</p>
+  <p>What goes wrong if you skip a stage:</p>
   <ul>
-    <li><strong>Stage 1</strong> (VPC + GKE control plane + node pool): 8–12 minutes.</li>
-    <li><strong>Stage 2</strong> (Argo CD Helm chart + cloudflared deployment): 3–5 minutes.</li>
+    <li><strong>Skipping stage 1</strong> — the <code>kubernetes</code> and <code>helm</code> providers try to talk to a cluster endpoint that doesn't exist yet → <em>"Kubernetes cluster unreachable"</em>.</li>
+    <li><strong>Skipping stage 2a</strong> (going stage 1 → bare <code>apply</code>) — the <code>kubernetes_manifest.prodx_root_app</code> resource validates its <code>apiVersion: argoproj.io/v1alpha1</code> against the cluster's discovery API at <em>plan time</em>. Argo CD's CRDs aren't installed yet, so the plan errors with <em>"no matches for kind Application in group argoproj.io"</em>.</li>
   </ul>
 
-  <p>Subsequent applies are a single <code>terraform apply</code> and usually finish in under a minute unless you touched the cluster config.</p>
+  <p>After the first full apply, every subsequent <code>terraform apply</code> is a single bare command and usually finishes in under a minute unless you touched the cluster config.</p>
 
   <div class="callout note">
-    <p><strong>Why two stages only on the first run?</strong> After the cluster exists, Terraform can read its endpoint at plan time, the provider config resolves, and helm + kubernetes resources plan cleanly in one pass.</p>
+    <p><strong>Why the staged dance only on the first run?</strong> After the cluster + helm release exist, every provider can introspect what it needs at plan time and one pass suffices. The chicken-and-eggs are purely a bootstrap concern — they don't recur.</p>
   </div>
 </section>
 
@@ -1265,16 +1273,25 @@ curl -s https://prodx.pbcv.dev/api/metrics
 
   <h3>Daily / between sessions — keep the project, kill the cluster</h3>
   <p>To preserve free-trial credit while not actively working:</p>
-<pre><code># Optional: delete the Argo Application first so Argo CD removes the
-# prodx namespace gracefully (including PVCs -- otherwise they orphan
-# as 1Gi Persistent Disks at ~$0.04/GB/month each).
-kubectl -n argocd delete application prodx
-kubectl wait --for=delete namespace/prodx --timeout=120s
+<pre><code># Step 1: delete the prodx namespace directly. The cascade-deletes the PVCs,
+# which in turn delete the underlying Persistent Disks (standard-rwo has
+# reclaimPolicy: Delete by default). Without this, the PDs orphan at ~$0.04/GB/month each.
+# (Tip: deleting the Argo Application alone with `kubectl delete application prodx` is NOT
+# reliable -- in practice Argo CD's finalizer doesn't always cascade in time before
+# terraform destroy nukes the helm release, leaving the namespace and PVCs orphaned.)
+kubectl delete namespace prodx --wait=false
+kubectl wait --for=delete namespace/prodx --timeout=180s
 
+# Step 2: terraform destroy the rest of the env
 cd ProdXTF/envs/dev
 terraform destroy</code></pre>
 
-  <p>This removes the cloudflared deployment, the Argo CD release, the GKE cluster, and the VPC — about 4–8 minutes. State stays in HCP Terraform so the next <code>apply</code> rebuilds everything from the same config. The GCP project stays; the project alone costs $0/month.</p>
+  <p>This removes the cloudflared deployment, the Argo CD release, the GKE cluster, and the VPC — about 4 minutes. State stays in HCP Terraform so the next <code>apply</code> rebuilds everything from the same config. The GCP project stays; the project alone costs $0/month.</p>
+
+  <p>Verify no orphan PDs:</p>
+<pre><code>gcloud compute disks list --project prodx-dev --filter='name!~"^gke-"'
+# Should print "Listed 0 items." -- only node boot disks (gke-*) survive and they
+# go away with the cluster.</code></pre>
 
   <div class="callout warn">
     <p><strong>About the kubectl delete step:</strong> if you skip it and go straight to <code>terraform destroy</code>, the cluster's PVs/PDs <em>may</em> survive cluster deletion and keep billing. The Argo Application's <code>resources-finalizer.argocd.argoproj.io</code> ensures Argo CD removes child resources (PVCs included) when the Application is deleted. <strong>If you forgot:</strong> check <code>gcloud compute disks list --project prodx-dev</code> for orphans and delete them with <code>gcloud compute disks delete &lt;name&gt; --zone europe-west3-a</code>.</p>
@@ -1403,18 +1420,29 @@ terraform apply                                # ~3 min; creates prodx-dev proje
 gcloud config set project $(terraform output -raw project_id)
 gcloud auth application-default set-quota-project $(terraform output -raw project_id)</code></pre>
 
-  <h3>15.9 — Dev apply (creates GKE + Argo CD + cloudflared)</h3>
+  <h3>15.9 — Dev apply (creates GKE + Argo CD + cloudflared + root Argo App)</h3>
+
+  <p>Three stages on a fresh state, all verified by a full <code>terraform destroy</code> + replay. Run them in order:</p>
 <pre><code>cd ../dev
 cp terraform.tfvars.example terraform.tfvars
 # edit terraform.tfvars:
 #   project_id               = "prodx-dev"
 #   cloudflared_tunnel_token = "&lt;the JWT from step 15.7&gt;"
 
-terraform init
+terraform init                                                              # ~30s
 
-# Two-stage on first apply (cluster must exist before helm/k8s providers configure)
-terraform apply -target=module.network -target=module.cluster     # ~10 min
-terraform apply                                                    # ~5 min</code></pre>
+# Stage 1: VPC + GKE cluster + node pool
+terraform apply -target=module.network -target=module.cluster -auto-approve # ~14 min
+
+# Stage 2a: Argo CD Helm release (installs argoproj.io CRDs) + cloudflared
+terraform apply -target=module.argocd -target=module.cloudflared -auto-approve  # ~8 min
+
+# Stage 2b: the root Argo CD Application that points at ProdXCD
+terraform apply -auto-approve                                               # ~1s</code></pre>
+
+  <div class="callout warn">
+    <p><strong>Why three stages, not two:</strong> the original "two-stage" advice was incomplete. The <code>kubernetes_manifest</code> for the root Argo Application validates its CRD at <em>plan time</em>, but the CRD is installed by the helm release in the same configuration. Without the 2a step, plan errors with <em>"no matches for kind Application in group argoproj.io"</em>. The split between 2a and 2b is purely a bootstrap concern — subsequent <code>terraform apply</code>s are a single bare command.</p>
+  </div>
 
   <h3>15.10 — Load kubeconfig + verify cluster</h3>
 <pre><code>$(terraform output -raw get_credentials_command)
@@ -1424,8 +1452,20 @@ kubectl get pods -A
 # Tunnel connection check (4 "Registered tunnel connection" lines per pod = good)
 kubectl -n cloudflared logs deploy/cloudflared --tail=20 | grep Registered</code></pre>
 
-  <h3>15.11 — Bootstrap the root Argo CD Application (still inside envs/dev)</h3>
-  <p>The <code>kubernetes_manifest</code> for the root Application is already in <code>envs/dev/argocd_apps.tf</code>. The first <code>terraform apply</code> in 15.9 only ran <code>-target=module.{network,cluster}</code>, and the second <code>terraform apply</code> picked up everything else <strong>including</strong> the Application. So no extra command is required — it's already done.</p>
+  <h3>15.11 — Wait for Argo CD to sync ProdXCD</h3>
+  <p>The root Application from 15.9 stage 2b tells Argo CD to watch ProdXCD. Argo polls every ~3 min, or trigger it immediately:</p>
+<pre><code>kubectl -n argocd annotate application prodx argocd.argoproj.io/refresh=normal --overwrite
+
+# Watch sync + workload creation (~3-5 min until all 4 pods are Running)
+kubectl -n argocd get application prodx -w   # Ctrl-C when Synced / Healthy
+
+# Confirm
+kubectl -n prodx get pods
+# NAME                          READY   STATUS    RESTARTS   AGE
+# postgres-0                    1/1     Running   0          ...
+# prodx-api-xxxxxxxxxx-xxxxx    1/1     Running   1-2        ...   ← restarts while postgres warms up
+# prodx-web-xxxxxxxxxx-xxxxx    1/1     Running   0          ...
+# redis-0                       1/1     Running   0          ...</code></pre>
 
   <p>If you need to manually re-apply it (e.g. you deleted it via <code>kubectl</code>):</p>
 <pre><code>terraform apply -target=kubernetes_manifest.prodx_root_app</code></pre>
@@ -1466,13 +1506,16 @@ kubectl -n prodx rollout status deployment/prodx-api
 # Refresh https://prodx.pbcv.dev — your edit is live.</code></pre>
 
   <h3>15.16 — Tear it all down (preserve trial credit)</h3>
-<pre><code># Daily: kill the cluster, keep the project
-kubectl -n argocd delete application prodx                # frees the PVCs via Argo's finalizer
-kubectl wait --for=delete namespace/prodx --timeout=120s
-cd ProdXTF/envs/dev &amp;&amp; terraform destroy
+<pre><code># Daily: kill the cluster, keep the project (~4 min terraform destroy)
+kubectl delete namespace prodx --wait=false                # cascades to PVCs → PDs
+kubectl wait --for=delete namespace/prodx --timeout=180s
+cd ProdXTF/envs/dev &amp;&amp; terraform destroy -auto-approve
+
+# Verify no orphan PDs (should print 'Listed 0 items.')
+gcloud compute disks list --project prodx-dev --filter='name!~"^gke-"'
 
 # Full wipe (project too)
-cd ../bootstrap &amp;&amp; terraform destroy</code></pre>
+cd ../bootstrap &amp;&amp; terraform destroy -auto-approve</code></pre>
 
   <div class="callout note">
     <p>Every command above is the same one you'd find scattered through sections 5–14 — this section just consolidates them in execution order with no narrative. Use it as a sanity check when you're stuck on whether you missed a step.</p>
@@ -1501,8 +1544,12 @@ cd ../bootstrap &amp;&amp; terraform destroy</code></pre>
   <p>Docker Hub token has the wrong scope, or the secret names in GitHub are wrong. Re-create the token with Read+Write+Delete and double-check the secrets are spelled <code>DOCKERHUB_USERNAME</code> and <code>DOCKERHUB_TOKEN</code> exactly.</p>
 
   <h3><code>terraform apply</code> errors on the helm release: "Kubernetes cluster unreachable"</h3>
-  <p>Classic first-apply chicken-and-egg. Run the two-stage apply once:</p>
-<pre><code>terraform apply -target=module.network -target=module.cluster
+  <p>First chicken-and-egg: the <code>helm</code>/<code>kubernetes</code> providers can't reach the cluster until it exists. Do stage 1 of the three-stage first apply (see <a href="#commands">15.9</a>):</p>
+<pre><code>terraform apply -target=module.network -target=module.cluster</code></pre>
+
+  <h3><code>terraform plan</code> errors with <em>"no matches for kind 'Application' in group 'argoproj.io'"</em></h3>
+  <p>Second chicken-and-egg: the <code>kubernetes_manifest.prodx_root_app</code> resource validates the Argo CD CRDs at plan time, but they only get installed by the helm release in the same configuration. Do stage 2a before the bare apply:</p>
+<pre><code>terraform apply -target=module.argocd -target=module.cloudflared
 terraform apply</code></pre>
 
   <h3><code>Error 403: Project ... is not authorized</code> when calling a GCP API</h3>
