@@ -342,9 +342,10 @@ footer {
         <li><a href="#bootstrap">10. terraform apply: bootstrap</a></li>
         <li><a href="#apply">11. terraform apply: dev</a></li>
         <li><a href="#verify">12. Verify it works</a></li>
-        <li><a href="#prodxcd">13. Next: ProdXCD</a></li>
+        <li><a href="#prodxcd">13. ProdXCD + Argo App</a></li>
         <li><a href="#teardown">14. Teardown</a></li>
-        <li><a href="#troubleshooting">15. Troubleshooting</a></li>
+        <li><a href="#commands">15. Quick reference</a></li>
+        <li><a href="#troubleshooting">16. Troubleshooting</a></li>
       </ol>
     </nav>
   </aside>
@@ -661,7 +662,37 @@ gcloud auth application-default login</code></pre>
 <section id="hcp">
   <h2><span class="step">08</span>HCP Terraform setup</h2>
 
-  <p>"Terraform Cloud" was renamed to "HCP Terraform" in 2024 — same product, same free tier (up to 5 users). We need <strong>two workspaces</strong>: one for the bootstrap env (creates the GCP project), one for the dev env (creates the cluster).</p>
+  <p>"Terraform Cloud" was renamed to "HCP Terraform" in 2024 — same product, same free tier (up to 5 users).</p>
+
+  <h3>What is HCP Terraform actually doing for us?</h3>
+
+  <p>If you've only used Terraform locally before, the natural question is "why do I need an extra service?". For this project, HCP Terraform plays exactly <strong>one</strong> role in the default (Local execution mode) setup:</p>
+
+  <ul>
+    <li><strong>It stores the Terraform state file</strong> — a JSON document that maps every resource in your <code>.tf</code> code to its real-world counterpart (this GCP project, that GKE cluster, those K8s resources, etc.). Without remote state, that JSON lives in <code>terraform.tfstate</code> on your laptop. Lose your laptop, lose your state, and Terraform has no idea what's already provisioned — you'd have to <code>terraform import</code> everything by hand. HCP keeps it safe.</li>
+  </ul>
+
+  <p>That's the whole job for now. Specifically, HCP <strong>is not</strong>:</p>
+
+  <ul>
+    <li><strong>Running terraform commands</strong> — that's still happening on your laptop (Execution Mode = Local). HCP's runners do nothing.</li>
+    <li><strong>Holding your GCP credentials</strong> — they're in your local <code>gcloud</code> ADC, never uploaded.</li>
+    <li><strong>Watching your repo or auto-applying</strong> — that would be VCS-driven mode, which we're not using.</li>
+    <li><strong>Doing policy enforcement</strong> (Sentinel) or cost estimation — paid-tier features.</li>
+  </ul>
+
+  <p>What you get for free even in this minimal mode:</p>
+  <ul>
+    <li><strong>State locking</strong> — only one <code>terraform apply</code> can run at a time per workspace. Prevents corruption if two people apply simultaneously.</li>
+    <li><strong>State versioning</strong> — every apply creates a new state version in the UI. You can browse history, see diffs, and roll back if something goes very wrong.</li>
+    <li><strong>Secret-safe variables</strong> (if you choose to upload any) — workspace variables marked sensitive are encrypted at rest.</li>
+    <li><strong>A web UI showing your infrastructure</strong> — resource list, drift detection, run history.</li>
+  </ul>
+
+  <p>Upgrade path: when you want CI to run terraform on your behalf, you switch the workspace to <strong>Remote</strong> execution and upload credentials (or use Workload Identity Federation with GCP — short-lived tokens, no static key). Same workspaces, same state, just a different runner.</p>
+
+  <h3>Create the two workspaces</h3>
+  <p>This project uses two workspaces because we have two Terraform root configurations (<code>envs/bootstrap</code> and <code>envs/dev</code>), each with independent state. Workspaces in HCP map 1:1 to root configs.</p>
 
   <ol>
     <li>Sign up at <a href="https://app.terraform.io/signup/account">app.terraform.io/signup/account</a>.</li>
@@ -891,6 +922,36 @@ INF Registered tunnel connection connIndex=3 ...</code></pre>
 
   <p>This is the last piece that closes the loop: a Helm chart in a separate repo (<a href="https://github.com/DemOnJR/ProdXCD"><code>ProdXCD</code></a>) that Argo CD pulls from, plus a one-time <code>Application</code> resource in ProdXTF that registers the chart with Argo. Once both are in place, every push to ProdX → CI builds → Docker Hub → Argo detects → cluster reconciles. No <code>kubectl apply</code> ever leaves your laptop.</p>
 
+  <h3>13.0 — Argo CD configuration (set by ProdXTF, not by you)</h3>
+  <p>The <code>argocd</code> module in ProdXTF installs the official <a href="https://github.com/argoproj/argo-helm">argo-cd Helm chart</a> with all defaults, except two intentional overrides — both because we sit Argo CD behind Cloudflare Tunnel:</p>
+
+<pre><code># ProdXTF/modules/argocd/main.tf — values passed to helm_release
+values = [
+  yamlencode({
+    server = {
+      service = {
+        type = "ClusterIP"        # default is LoadBalancer; we don't want a $20/mo GCP LB
+      }                           # because cloudflared reaches argocd-server in-cluster.
+    }
+    configs = {
+      params = {
+        "server.insecure" = "true"  # makes argocd-server speak HTTP on :80 instead of
+      }                             # HTTPS-with-self-signed-cert on :443. TLS is already
+    }                               # terminated at Cloudflare's edge before the request
+  })                                # enters the tunnel, so HTTPS in-cluster would be
+]                                   # double-encryption (and break the CF tunnel ingress
+                                    # rule unless we set originRequest.noTLSVerify).</code></pre>
+
+  <p>Everything else (the controller, repo-server, applicationset-controller, dex, redis, notifications-controller, the CRDs) uses chart defaults. The Helm release is pinned to chart version <code>7.7.7</code> in <code>envs/dev/variables.tf</code> — bump that var if you want to upgrade Argo CD.</p>
+
+  <h4>What you can configure on Argo CD itself after it's up</h4>
+  <ul>
+    <li><strong>Change the admin password</strong> — log in once with the bootstrap password (<code>kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d</code>), top-right "User Info" → Update Password. Then delete the bootstrap secret (<code>kubectl -n argocd delete secret argocd-initial-admin-secret</code>).</li>
+    <li><strong>Add more Applications</strong> — write the manifest into ProdXCD (or another repo) and either commit a new <code>Application</code> there for an existing "root" Application to find (app-of-apps pattern), or add another <code>kubernetes_manifest</code> to <code>envs/dev/argocd_apps.tf</code>.</li>
+    <li><strong>Add repo credentials</strong> for private Git repos — Argo CD settings → Repositories → Connect Repo. Or persist via a <code>Secret</code> labeled <code>argocd.argoproj.io/secret-type: repository</code>.</li>
+    <li><strong>RBAC / SSO</strong> — Argo CD supports OIDC, GitHub, Google, etc. via the chart's <code>configs.cm</code> and <code>configs.rbac</code> values. We don't bother for a single-user dev cluster.</li>
+  </ul>
+
   <h3>13.1 — The ProdXCD Helm chart</h3>
   <p>Layout:</p>
 <pre><code>ProdXCD/
@@ -1029,8 +1090,166 @@ terraform destroy</code></pre>
   </div>
 </section>
 
+<section id="commands">
+  <h2><span class="step">15</span>Quick reference: every command, in order</h2>
+
+  <p>Distilled copy-paste-friendly recipe — only the commands a fresh follower needs. No debugging detours. Assumes WSL/Linux shell; PowerShell variants noted where they differ.</p>
+
+  <h3>15.1 — Install the CLIs (one-time per machine)</h3>
+<pre><code># WSL / Linux
+sudo apt update
+sudo apt install -y git jq curl
+sudo snap install google-cloud-cli --classic
+sudo snap install kubectl --classic
+# Terraform: HashiCorp APT repo (one-liner is on https://developer.hashicorp.com/terraform/install)
+
+# Windows (PowerShell as admin)
+winget install Git.Git
+winget install Docker.DockerDesktop
+winget install Google.CloudSDK
+winget install Hashicorp.Terraform
+winget install Kubernetes.kubectl</code></pre>
+
+  <h3>15.2 — Clone the three repos</h3>
+<pre><code>mkdir -p prodx-workspace &amp;&amp; cd prodx-workspace
+git clone https://github.com/DemOnJR/ProdX.git
+git clone https://github.com/DemOnJR/ProdXTF.git
+git clone https://github.com/DemOnJR/ProdXCD.git</code></pre>
+
+  <h3>15.3 — Run ProdX locally (verify the app works before touching cloud)</h3>
+<pre><code>cd ProdX
+docker compose up --build           # ~3 min first time
+# open http://localhost:8080
+docker compose down                 # stops; data persists in pg_data volume
+cd ..</code></pre>
+
+  <h3>15.4 — Set up GitHub CI secrets</h3>
+  <p>Browser: <a href="https://hub.docker.com/settings/security">hub.docker.com → Security → New Access Token</a> with Read+Write+Delete. Then in GitHub at the ProdX repo: Settings → Secrets and variables → Actions → New repository secret:</p>
+<pre><code>DOCKERHUB_USERNAME = your-dockerhub-username
+DOCKERHUB_TOKEN    = the-token-you-just-created</code></pre>
+
+  <h3>15.5 — Google Cloud (gcloud + free trial)</h3>
+<pre><code>gcloud auth login                              # browser flow
+gcloud auth application-default login          # browser flow, separate creds for TF
+gcloud billing accounts list                   # → save the ACCOUNT_ID (the OPEN one)</code></pre>
+
+  <h3>15.6 — HCP Terraform (browser + CLI)</h3>
+  <ol>
+    <li>Sign up at <a href="https://app.terraform.io">app.terraform.io</a>; create an org (note the name).</li>
+    <li>Create two workspaces, both <strong>CLI-driven</strong>: <code>prodx-bootstrap</code> and <code>prodx-dev</code>.</li>
+    <li>For <em>each</em> workspace: Settings → General → Execution Mode → <strong>Local</strong> → Save settings.</li>
+    <li>Edit both <code>ProdXTF/envs/bootstrap/versions.tf</code> and <code>ProdXTF/envs/dev/versions.tf</code> — replace <code>REPLACE_ME_TFC_ORG</code> with your org name.</li>
+  </ol>
+<pre><code>terraform login                                # browser flow, writes ~/.terraform.d/credentials.tfrc.json</code></pre>
+
+  <h3>15.7 — Cloudflare tunnel (browser)</h3>
+  <ol>
+    <li><a href="https://one.dash.cloudflare.com">one.dash.cloudflare.com</a> → Networks → Tunnels → Create a tunnel → Cloudflared → name it <code>prodx-dev</code>.</li>
+    <li>Copy the JWT after <code>--token</code> in the displayed <code>docker run</code> command. Save it.</li>
+    <li>Public Hostnames tab → add three:
+      <ul>
+        <li><code>argocd.pbcv.dev</code> → HTTP → <code>argocd-server.argocd.svc.cluster.local:80</code></li>
+        <li><code>prodx.pbcv.dev</code> → HTTP → <code>prodx-web.prodx.svc.cluster.local:80</code></li>
+        <li><code>prodxapi.pbcv.dev</code> → HTTP → <code>prodx-api.prodx.svc.cluster.local:8000</code></li>
+      </ul>
+    </li>
+  </ol>
+
+  <h3>15.8 — Bootstrap apply (creates the GCP project)</h3>
+<pre><code>cd ProdXTF/envs/bootstrap
+cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars: set billing_account from step 15.5
+
+# If gcloud ADC has a stale quota_project_id from a previous project, clear it:
+[ "$(grep -c quota_project_id ~/.config/gcloud/application_default_credentials.json)" = "1" ] &amp;&amp; \
+  jq 'del(.quota_project_id)' ~/.config/gcloud/application_default_credentials.json &gt; /tmp/adc.json &amp;&amp; \
+  mv /tmp/adc.json ~/.config/gcloud/application_default_credentials.json
+
+terraform init
+terraform apply                                # ~3 min; creates prodx-dev project + 5 APIs
+
+# Pin gcloud to the new project
+gcloud config set project $(terraform output -raw project_id)
+gcloud auth application-default set-quota-project $(terraform output -raw project_id)</code></pre>
+
+  <h3>15.9 — Dev apply (creates GKE + Argo CD + cloudflared)</h3>
+<pre><code>cd ../dev
+cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars:
+#   project_id               = "prodx-dev"
+#   cloudflared_tunnel_token = "&lt;the JWT from step 15.7&gt;"
+
+terraform init
+
+# Two-stage on first apply (cluster must exist before helm/k8s providers configure)
+terraform apply -target=module.network -target=module.cluster     # ~10 min
+terraform apply                                                    # ~5 min</code></pre>
+
+  <h3>15.10 — Load kubeconfig + verify cluster</h3>
+<pre><code>$(terraform output -raw get_credentials_command)
+kubectl get nodes
+kubectl get pods -A
+
+# Tunnel connection check (4 "Registered tunnel connection" lines per pod = good)
+kubectl -n cloudflared logs deploy/cloudflared --tail=20 | grep Registered</code></pre>
+
+  <h3>15.11 — Bootstrap the root Argo CD Application (still inside envs/dev)</h3>
+  <p>The <code>kubernetes_manifest</code> for the root Application is already in <code>envs/dev/argocd_apps.tf</code>. The first <code>terraform apply</code> in 15.9 only ran <code>-target=module.{network,cluster}</code>, and the second <code>terraform apply</code> picked up everything else <strong>including</strong> the Application. So no extra command is required — it's already done.</p>
+
+  <p>If you need to manually re-apply it (e.g. you deleted it via <code>kubectl</code>):</p>
+<pre><code>terraform apply -target=kubernetes_manifest.prodx_root_app</code></pre>
+
+  <h3>15.12 — Argo CD admin password + UI</h3>
+<pre><code>$(terraform output -raw argocd_initial_admin_secret_command)
+# prints the password; user is `admin`. Open https://argocd.pbcv.dev
+
+# After logging in once, delete the bootstrap secret
+kubectl -n argocd delete secret argocd-initial-admin-secret</code></pre>
+
+  <h3>15.13 — Manually trigger a sync (or wait ~3 min for auto-poll)</h3>
+<pre><code># Soft refresh (re-reads ProdXCD from Git)
+kubectl -n argocd annotate application prodx argocd.argoproj.io/refresh=normal --overwrite
+
+# Force sync now
+kubectl -n argocd patch app prodx --type merge \
+  -p '{"operation":{"initiatedBy":{"username":"manual"},"sync":{"revision":"HEAD","prune":true}}}'
+
+# Watch sync status
+kubectl -n argocd get application prodx -w</code></pre>
+
+  <h3>15.14 — Smoke test all three public URLs</h3>
+<pre><code>curl -sI https://argocd.pbcv.dev | head -3       # Argo CD login page, HTTP/2 200
+curl -s  https://prodxapi.pbcv.dev/api/metrics   # JSON: postgres/redis health
+curl -s  https://prodx.pbcv.dev/api/metrics      # same JSON, via in-pod nginx proxy
+curl -s  https://prodxapi.pbcv.dev/api/graphs/prodx | jq '.nodes | length'   # 12</code></pre>
+
+  <h3>15.15 — Ship a code change end-to-end (the actual GitOps demo)</h3>
+<pre><code># In ProdX:
+$EDITOR backend/app/seed.py                      # change a node label
+git commit -am "tweak label" &amp;&amp; git push        # CI builds &amp; pushes :latest
+
+# Wait ~2 min for CI; then force the new image into the cluster:
+kubectl -n prodx rollout restart deployment/prodx-api
+kubectl -n prodx rollout status deployment/prodx-api
+
+# Refresh https://prodx.pbcv.dev — your edit is live.</code></pre>
+
+  <h3>15.16 — Tear it all down (preserve trial credit)</h3>
+<pre><code># Daily: kill the cluster, keep the project
+kubectl -n argocd delete application prodx                # frees the PVCs via Argo's finalizer
+kubectl wait --for=delete namespace/prodx --timeout=120s
+cd ProdXTF/envs/dev &amp;&amp; terraform destroy
+
+# Full wipe (project too)
+cd ../bootstrap &amp;&amp; terraform destroy</code></pre>
+
+  <div class="callout note">
+    <p>Every command above is the same one you'd find scattered through sections 5–14 — this section just consolidates them in execution order with no narrative. Use it as a sanity check when you're stuck on whether you missed a step.</p>
+  </div>
+</section>
+
 <section id="troubleshooting">
-  <h2><span class="step">15</span>Troubleshooting</h2>
+  <h2><span class="step">16</span>Troubleshooting</h2>
 
   <h3>HCP Terraform plan errors with "could not find default credentials"</h3>
   <p>The workspace is still on Remote execution mode. HCP's runners don't have your local <code>gcloud</code> ADC, so calls error out. Open the workspace → Settings → General → Execution Mode → <strong>Local</strong> → Save settings, then re-run <code>terraform plan</code>. New workspaces default to Remote even when created as CLI-driven.</p>
