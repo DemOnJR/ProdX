@@ -19,7 +19,6 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/ci-backend.yml'
-      - '.github/scripts/trivy-summary.py'
   pull_request:
     branches: [main]
 
