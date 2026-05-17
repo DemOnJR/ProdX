@@ -1317,18 +1317,26 @@ terraform destroy</code></pre>
   <h3>Full wipe — destroy the project too</h3>
   <p>Done with the project entirely:</p>
 <pre><code># Dev first (cluster + tunnel)
-cd ProdXTF\envs\dev
-terraform destroy
+cd ProdXTF/envs/dev
+kubectl delete namespace prodx --wait=false &amp;&amp; kubectl wait --for=delete namespace/prodx --timeout=180s
+terraform destroy -auto-approve
 
-# Then bootstrap (deletes the project, but tag key + values stay
-# because they have prevent_destroy = true)
-cd ..\bootstrap
-terraform destroy</code></pre>
+# Then bootstrap (soft-deletes the project)
+cd ../bootstrap
+terraform destroy -auto-approve</code></pre>
 
-  <p>If you also want to remove the org-level <code>environment</code> tag (e.g. you're nuking everything and moving on):</p>
-<pre><code># Temporarily remove the prevent_destroy lifecycle blocks in
-# envs/bootstrap/main.tf, then:
-terraform destroy</code></pre>
+  <div class="callout danger">
+    <p><strong>30-day project ID reservation.</strong> When the bootstrap destroy soft-deletes the project, GCP keeps the project ID reserved for 30 days (so the deletion can be reversed via <code>gcloud projects undelete &lt;id&gt;</code>). During those 30 days <em>you cannot create a new project with the same ID</em>. To re-apply bootstrap during the reservation window, edit <code>envs/bootstrap/terraform.tfvars</code> with a different <code>project_id</code> (e.g. append a suffix: <code>project_id = "prodx-dev2"</code>) and remember to update <code>envs/dev/terraform.tfvars</code> to match before applying dev.</p>
+    <p>Verified the hard way — this document was rebuilt against <code>prodx-dev2</code> after a clean destroy+replay of bootstrap.</p>
+  </div>
+
+  <div class="callout note">
+    <p>After destroying bootstrap, your ADC's <code>quota_project_id</code> still points at the now-soft-deleted project. Future TF runs will fail with "project not found". Clear it before re-applying:</p>
+<pre><code>python3 -c 'import json,os; p=os.path.expanduser("~/.config/gcloud/application_default_credentials.json"); d=json.load(open(p)); d.pop("quota_project_id", None); json.dump(d, open(p,"w"))'
+# or with jq:
+# jq 'del(.quota_project_id)' ~/.config/gcloud/application_default_credentials.json &gt; /tmp/adc.json &amp;&amp; mv /tmp/adc.json ~/.config/gcloud/application_default_credentials.json</code></pre>
+    <p>Then after the new bootstrap apply succeeds, re-pin: <code>gcloud auth application-default set-quota-project &lt;new-project-id&gt;</code>.</p>
+  </div>
 
   <div class="callout warn">
     <p><strong>Things <code>terraform destroy</code> does NOT clean up:</strong></p>
@@ -1565,10 +1573,18 @@ kubectl wait --for=delete namespace/prodx --timeout=180s
 cd ProdXTF/envs/dev &amp;&amp; terraform destroy -auto-approve
 
 # Verify no orphan PDs (should print 'Listed 0 items.')
-gcloud compute disks list --project prodx-dev --filter='name!~"^gke-"'
+gcloud compute disks list --project &lt;your-project-id&gt; --filter='name!~"^gke-"'
 
-# Full wipe (project too)
-cd ../bootstrap &amp;&amp; terraform destroy -auto-approve</code></pre>
+# Full wipe (project too) — see warning below about ID reservation
+cd ../bootstrap &amp;&amp; terraform destroy -auto-approve
+
+# After bootstrap destroy, clear stale ADC quota_project_id so future TF
+# runs against a different project don't hit "project not found":
+python3 -c 'import json,os; p=os.path.expanduser("~/.config/gcloud/application_default_credentials.json"); d=json.load(open(p)); d.pop("quota_project_id", None); json.dump(d, open(p,"w"))'</code></pre>
+
+  <div class="callout danger">
+    <p><strong>30-day project ID reservation.</strong> After bootstrap destroy, the project enters <code>DELETE_REQUESTED</code> state and its ID is reserved for 30 days. You cannot create a new project with the same ID until the reservation expires (or you successfully <code>gcloud projects undelete &lt;id&gt;</code>). To re-apply bootstrap before then, change <code>project_id</code> in <code>envs/bootstrap/terraform.tfvars</code> to a different value (e.g. add a suffix: <code>prodx-dev2</code>) AND update <code>envs/dev/terraform.tfvars</code> to match before re-applying dev. Verified the hard way — this entire document was rebuilt against <code>prodx-dev2</code> after a clean bootstrap destroy+replay.</p>
+  </div>
 
   <div class="callout note">
     <p>Every command above is the same one you'd find scattered through sections 5–14 — this section just consolidates them in execution order with no narrative. Use it as a sanity check when you're stuck on whether you missed a step.</p>
