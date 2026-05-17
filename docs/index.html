@@ -1010,7 +1010,7 @@ cloud {
   <h3>Fill in the tfvars</h3>
 <pre><code>cd ProdXTF/envs/bootstrap
 cp terraform.tfvars.example terraform.tfvars
-$EDITOR terraform.tfvars         # or notepad / nano / vim</code></pre>
+$EDITOR terraform.tfvars         # or nano / vim</code></pre>
 
   <p>One required value — the billing account ID from step 7.3:</p>
 <pre><code>billing_account = "XXXXXX-XXXXXX-XXXXXX"
@@ -1048,13 +1048,8 @@ terraform apply</code></pre>
 
   <h3>Pin gcloud + ADC to the new project</h3>
   <p>Now that the project exists, point gcloud at it (and pin ADC's quota project so no quota warnings):</p>
-<pre><code># bash / WSL
-gcloud config set project $(terraform output -raw project_id)
-gcloud auth application-default set-quota-project $(terraform output -raw project_id)
-
-# PowerShell
-gcloud config set project (terraform output -raw project_id)
-gcloud auth application-default set-quota-project (terraform output -raw project_id)</code></pre>
+<pre><code>gcloud config set project $(terraform output -raw project_id)
+gcloud auth application-default set-quota-project $(terraform output -raw project_id)</code></pre>
 
   <div class="callout warn">
     <p>gcloud will still print the <code>environment</code> tag warning. <strong>Ignore it</strong> — see step 7.3 for why. It's purely cosmetic on parentless projects.</p>
@@ -1114,7 +1109,7 @@ terraform apply</code></pre>
   <h2><span class="step">12</span>Verify it works</h2>
 
   <h3>Get cluster credentials and check the pods</h3>
-<pre><code>terraform output -raw get_credentials_command | Invoke-Expression
+<pre><code>eval "$(terraform output -raw get_credentials_command)"
 
 kubectl get nodes
 kubectl get pods -A</code></pre>
@@ -1147,7 +1142,7 @@ INF Registered tunnel connection connIndex=3 ...</code></pre>
   </ul>
 
   <h3>Log into Argo CD</h3>
-<pre><code>terraform output -raw argocd_initial_admin_secret_command | Invoke-Expression</code></pre>
+<pre><code>eval "$(terraform output -raw argocd_initial_admin_secret_command)"</code></pre>
   <p>That prints the bootstrap password. Username is <code>admin</code>. Log in at <code>https://argocd.pbcv.dev</code>.</p>
 
   <p>Right after first login, delete the bootstrap secret (good hygiene):</p>
