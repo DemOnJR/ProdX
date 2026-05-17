@@ -2,7 +2,7 @@ name: build-test-scan-push
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
     tags: ['v*.*.*']
   pull_request:
     branches: [main]
