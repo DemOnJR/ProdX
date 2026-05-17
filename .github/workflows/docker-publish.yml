@@ -18,6 +18,20 @@ env:
   REGISTRY: docker.io
   API_IMAGE: pbdaemon/prodx-api
   WEB_IMAGE: pbdaemon/prodx-web
+
+  # ─── Google Artifact Registry (the new home — private, no static secrets)
+  # Each release goes to BOTH registries during the cutover so we can flip
+  # the Helm chart safely. Values come from ProdXTF's `terraform output`:
+  #   GAR_REGISTRY  ← registry_url                       (split host/path)
+  #   GCP_WIF_*     ← wif_provider_for_workflow / wif_service_account_for_workflow
+  # Not secrets — security is enforced server-side by the WIF provider's
+  # attribute_condition (must equal "DemOnJR/ProdX"), not by hiding URLs.
+  GAR_REGISTRY: europe-west3-docker.pkg.dev
+  GAR_API_IMAGE: europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-api
+  GAR_WEB_IMAGE: europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-web
+  GCP_WIF_PROVIDER: projects/328683980484/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+  GCP_WIF_SA: gha-prodx-publisher@prodx-dev2.iam.gserviceaccount.com
+
   # Opt every JavaScript action into Node.js 24 immediately. Without this,
   # GitHub prints a deprecation warning per Node-20 action invocation; from
   # June 2 2026 it'll force Node 24 anyway; Node 20 is removed Sept 16 2026.
