@@ -6,8 +6,8 @@ name: CI · Frontend
 # Self-contained CI lifecycle for the React + Vite frontend service. Owns:
 #
 #     [🔍 TypeScript] ┐
-#     [🔨 Vite build] ├──► [🔨 Build image] ──► [🛡️ Scan image] ──► [🚢 Publish]
-#     [🔐 npm audit ] ┘                                              (main push only)
+#     [🔨 Vite build] ├──► [🛡️ Scan image (build + Trivy)] ──► [🚢 Publish]
+#     [🔐 npm audit ] ┘                                          (main push only)
 #
 # Mirrors ci-backend.yml. See that file's header for the architectural
 # rationale on the per-service split and the path-filter-only-on-push
@@ -33,11 +33,17 @@ env:
   GCP_WIF_PROVIDER: projects/328683980484/locations/global/workloadIdentityPools/github-pool/providers/github-provider
   GCP_WIF_SA: gha-prodx-publisher@prodx-dev2.iam.gserviceaccount.com
 
-  # Local-only tag used between Build and Scan jobs. Never gets pushed.
+  # Local-only tag used inside the Scan job to refer to the freshly built
+  # image. Never gets pushed.
   LOCAL_TAG: prodx-web:ci-scan
 
   # Opt every JavaScript action into Node.js 24 immediately. See ci-backend.yml.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+  # Suppress docker/build-push-action's default outputs. See ci-backend.yml
+  # for full notes on what these do.
+  DOCKER_BUILD_RECORD_UPLOAD: "false"
+  DOCKER_BUILD_SUMMARY: "false"
 
 jobs:
   # ════════════════════════════════════════════════════════════════════
@@ -159,11 +165,12 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ════════════════════════════════════════════════════════════════════
-  # Build — only starts once all 3 Quality jobs pass
+  # Scan — Build the image in-place + Trivy in one job. See ci-backend.yml
+  # for the rationale on merging the old Build+Scan pair.
   # ════════════════════════════════════════════════════════════════════
 
-  build:
-    name: 🔨 Frontend · Build image
+  scan:
+    name: 🛡️ Frontend · Scan image
     runs-on: ubuntu-latest
     needs: [typecheck, vite, audit]
     permissions:
@@ -175,7 +182,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build image (load locally + populate cache)
+      - name: Build image (load into local docker + populate cache for Publish)
         id: build
         uses: docker/build-push-action@v7
         with:
@@ -185,51 +192,6 @@ jobs:
           tags: ${{ env.LOCAL_TAG }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
-
-      - name: Save image as tarball
-        if: steps.build.outcome == 'success'
-        run: docker save ${{ env.LOCAL_TAG }} -o /tmp/frontend-image.tar
-
-      - name: Upload image artifact (for Scan job)
-        if: steps.build.outcome == 'success'
-        uses: actions/upload-artifact@v7
-        with:
-          name: frontend-image
-          path: /tmp/frontend-image.tar
-          retention-days: 1
-
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### 🔨 Frontend · Build image"
-            echo "| Step | Result |"
-            echo "|------|--------|"
-            echo "| docker build (Buildx + GHA cache) | ${{ steps.build.outcome }} |"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  # ════════════════════════════════════════════════════════════════════
-  # Scan — Trivy against the built image, CRITICAL+fixed gate
-  # ════════════════════════════════════════════════════════════════════
-
-  scan:
-    name: 🛡️ Frontend · Scan image
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout (for the parser script)
-        uses: actions/checkout@v6
-
-      - name: Download image artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: frontend-image
-          path: /tmp/
-
-      - name: Load image into local docker
-        run: docker load -i /tmp/frontend-image.tar
 
       - name: Trivy scan (full, all severities, JSON)
         id: scan
@@ -245,15 +207,6 @@ jobs:
         id: gate
         if: always() && steps.scan.outcome != 'skipped'
         run: python3 .github/scripts/trivy-summary.py frontend-trivy.json ${{ env.IMAGE }}:ci-scan
-
-      - name: Upload Trivy JSON report
-        if: always() && steps.scan.outcome != 'skipped'
-        uses: actions/upload-artifact@v7
-        with:
-          name: frontend-trivy-report
-          path: frontend-trivy.json
-          retention-days: 14
-          if-no-files-found: warn
 
   # ════════════════════════════════════════════════════════════════════
   # Publish — only on main push, never on PRs
