@@ -400,61 +400,100 @@ footer {
 <section id="architecture">
   <h2><span class="step">02</span>Architecture</h2>
 
-  <h3>Runtime (what happens when a user opens <code>prodx.pbcv.dev</code>)</h3>
+  <h3>Runtime — what happens when a user opens <code>prodx.pbcv.dev</code></h3>
   <div class="diagram">
-<pre>                Browser
-                   │  HTTPS
-                   ▼
-       ┌──────────────────────────┐
-       │  Cloudflare edge (TLS)   │
-       └──────────────┬───────────┘
-                      │
-              Cloudflare Tunnel
-              (outbound from cluster, no inbound ports)
-                      │
-       ┌──────────────┴───────────────────┐
-       │  cloudflared Deployment (2 pods) │
-       │  reads ingress rules from CF API │
-       └──┬────────────┬──────────────┬───┘
-          │            │              │
-          ▼            ▼              ▼
-   argocd-server   prodx-web      prodx-api
-   (Argo CD)       (nginx +       (FastAPI
-                    React SPA)     :8000)
+<pre>                                Browser
+                                   │  HTTPS request to prodx.pbcv.dev
+                                   ▼
+                       ┌──────────────────────────┐
+                       │  Cloudflare edge (TLS)   │  cert managed by CF; no
+                       └──────────────┬───────────┘  cert-manager needed
                                       │
-                              ┌───────┴───────┐
-                              ▼               ▼
-                          PostgreSQL        Redis
-                          (JSONB graph)     (cache)
+                              QUIC tunnel  (outbound from cluster — zero
+                                      │   inbound ports, no LoadBalancer)
+                                      ▼
+                       ┌──────────────────────────┐
+                       │ cloudflared Deployment   │  routes per the Public
+                       │ (2 pods, 4 CF connections│  Hostnames you set in
+                       │  per pod to FRA edges)   │  the CF Zero Trust UI
+                       └──┬───────────┬────────┬──┘
+                          │           │        │   argocd.pbcv.dev →
+                          │           │        └──▶ argocd-server (kubectl
+                          │           │              port-forward equivalent
+                          │           │              but via tunnel)
+                          │           │
+                          │           │  prodxapi.pbcv.dev → prodx-api :8000
+                          │           ▼
+                          │     ┌───────────┐
+                          │     │ prodx-api │  FastAPI; envs/dev/main.tf
+                          │     │ Deployment│  injects DATABASE_URL +
+                          │     └─┬───────┬─┘  REDIS_URL + CORS_ORIGINS
+                          │       │       │
+                          │       ▼       ▼
+                          │  ┌────────┐ ┌──────┐
+                          │  │postgres│ │redis │  StatefulSet + PVC
+                          │  │  PVC   │ │ PVC  │  (standard-rwo PD)
+                          │  └────────┘ └──────┘
+                          │
+                          │  prodx.pbcv.dev → prodx-web :80
+                          ▼
+                    ┌──────────┐
+                    │ prodx-web│  nginx + React SPA. nginx config
+                    │Deployment│  proxies /api/* to prodx-api :8000
+                    └──────────┘  inside the cluster, so the SPA
+                                  uses relative URLs and the image
+                                  is environment-agnostic.
 
-                  ── GKE cluster (europe-west3-a) ──</pre>
+                ── GKE Standard zonal cluster (europe-west3-a) ──</pre>
     <div class="legend">
       <span>↓ TLS terminates at Cloudflare. Cluster has no public IP.</span>
+      <span>· cloudflared opens 4 QUIC connections per pod for redundancy</span>
     </div>
   </div>
 
-  <h3>GitOps flow (what happens when you push code)</h3>
+  <h3>GitOps flow — what happens when you push code</h3>
   <div class="diagram">
-<pre>  Developer push to ProdX repo
+<pre>  Developer push to DemOnJR/ProdX (app code)
               │
               ▼
        GitHub Actions
-   build pbdaemon/prodx-api
-   build pbdaemon/prodx-web
+   build pbdaemon/prodx-api:latest
+   build pbdaemon/prodx-web:latest
+              │       ──push──▶  Docker Hub
+              │
+              │  (image tag is `:latest` + `:sha-xxxxxxx`; the chart
+              │   in ProdXCD pins `:latest` and Always-pulls, so no
+              │   manifest change is required — only a pod restart)
               │
               ▼
-         Docker Hub
-              │
-              │   (future: CI also bumps image tag in ProdXCD)
+  kubectl -n prodx rollout restart deployment/prodx-api
+              │      (or wait for next reschedule)
               ▼
-        ProdXCD repo
+       new image pulled  ────────▶  new code live
+
+  ───────────────────────────────────────────────────────────────
+
+  Manifest changes go the other way:
+
+  Developer push to DemOnJR/ProdXCD (helm chart)
               │
-              │   Argo CD polls every ~3min
+              ▼     Argo CD polls main every ~3 min
+              │     (or `kubectl annotate app prodx
+              │      argocd.argoproj.io/refresh=normal`
+              │      for instant pickup)
               ▼
-        Argo CD (in-cluster)
+       Argo CD detects diff → applies into prodx namespace
               │
               ▼
-         GKE cluster</pre>
+       Deployment/StatefulSet/Service reconcile
+              │
+              ▼
+       Pods restart; new spec live
+
+  Future hardening: GitHub Actions in ProdX bumps the image tag in
+  ProdXCD (commit + push) on every successful build, so a push to
+  ProdX automatically triggers an Argo sync. Not wired yet — for now
+  the loop closes via :latest + pod restart.</pre>
     <div class="legend">
       <span>CI never holds cluster credentials. The cluster pulls — CI pushes only to Git and Docker Hub.</span>
     </div>
