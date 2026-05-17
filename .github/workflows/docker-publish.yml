@@ -59,7 +59,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=backend
 
       - name: Trivy scan (CRITICAL, fixed-only — fails build)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.API_IMAGE }}:ci-scan
           severity: CRITICAL
@@ -164,7 +164,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend
 
       - name: Trivy scan (CRITICAL, fixed-only — fails build)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.WEB_IMAGE }}:ci-scan
           severity: CRITICAL
