@@ -1321,8 +1321,12 @@ INF Registered tunnel connection connIndex=3 ...</code></pre>
   </ul>
 
   <h3>Log into Argo CD</h3>
-<pre><code>eval "$(terraform output -raw argocd_initial_admin_secret_command)"</code></pre>
-  <p>That prints the bootstrap password. Username is <code>admin</code>. Log in at <code>https://argocd.pbcv.dev</code>.</p>
+<pre><code>kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo</code></pre>
+  <p>That prints the bootstrap password. Username is <code>admin</code>. Log in at <code>https://argocd.pbcv.dev</code>. The trailing <code>; echo</code> just appends a newline so the password isn't glued to the next prompt line.</p>
+  <div class="callout note">
+    <p>Earlier versions of this doc used <code>eval "$(terraform output -raw argocd_initial_admin_secret_command)"</code>. That works in a clean bash shell from inside <code>envs/dev</code> after <code>terraform init</code> + a successful apply, but breaks the moment any of those preconditions slip (wrong directory, expired HCP login, fish/zsh quoting). The bare <code>kubectl</code> above only needs a loaded kubeconfig.</p>
+  </div>
 
   <p>Right after first login, delete the bootstrap secret (good hygiene):</p>
 <pre><code>kubectl -n argocd delete secret argocd-initial-admin-secret</code></pre>
@@ -1706,7 +1710,9 @@ kubectl -n prodx get pods
 <pre><code>terraform apply -target=kubernetes_manifest.prodx_root_app</code></pre>
 
   <h3>15.12 — Argo CD admin password + UI</h3>
-<pre><code>$(terraform output -raw argocd_initial_admin_secret_command)
+<pre><code># Bare kubectl: needs only a loaded kubeconfig. Works from any directory.
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
 # prints the password; user is `admin`. Open https://argocd.pbcv.dev
 
 # After logging in once, delete the bootstrap secret
