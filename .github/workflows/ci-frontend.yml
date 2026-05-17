@@ -142,6 +142,7 @@ jobs:
 
       - name: npm audit (CRITICAL threshold)
         id: audit
+        
         # --audit-level=critical: fail only on CRITICAL advisories (matches
         # the Trivy image scan threshold; raise to 'high' for stricter).
         run: npm audit --audit-level=critical

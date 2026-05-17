@@ -165,7 +165,7 @@ jobs:
         id: audit
         # Fails the build on any known CVE in requirements + transitive deps.
         run: pip-audit -r requirements.txt
-
+        
       - name: Summary
         if: always()
         working-directory: ${{ github.workspace }}
