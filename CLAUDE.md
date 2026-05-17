@@ -6,6 +6,19 @@
 - `main` is updated **only via pull requests** (`dev → main`), squash-merged in the GitHub UI.
 - The `sync-dev-with-main.yml` workflow auto-resets `dev` after every merge. Just `git pull` before starting new work — no manual reset recipe to remember.
 
+## CI layout
+
+```
+.github/workflows/
+├── ci-backend.yml          single-job pipeline: lint → test → audit → build → Trivy → publish
+├── ci-frontend.yml         single-job pipeline: typecheck → vite → audit → build → Trivy → publish
+└── sync-dev-with-main.yml  fires on push to main, force-resets dev to match
+```
+
+Each `ci-*.yml`:
+- **Push to main:** path-filtered. Only the changed service republishes its image to GAR.
+- **Pull request to main:** always runs (no PR path filter). Slightly wasteful in CI minutes when a PR only touches one service, but means the required "🛡️ Scan image" status checks are always posted — no skip-stub workflow needed.
+
 ## Branch model
 
 This repo uses GitHub Flow with one long-lived working branch:
@@ -29,7 +42,7 @@ git push origin dev                       # no CI fires on dev push (intentional
 # Next `git pull` on your local dev brings you to the post-merge state
 ```
 
-## What the PreToolUse hook enforces
+## What the PreToolUse hook (`.claude/`) enforces
 
 `.claude/hooks/prevent-main-push.sh` blocks two operations server-side (i.e. before Claude can even attempt them):
 
