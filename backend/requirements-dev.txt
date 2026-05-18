@@ -2,7 +2,7 @@
 # copies requirements.txt). Used by the GitHub Actions Quality matrix to run
 # lint, tests, and the dependency audit all from a single install step.
 -r requirements.txt
-ruff==0.7.4
+ruff==0.15.12
 pytest==8.3.4
 httpx==0.27.2
 pip-audit==2.10.0
