@@ -47,7 +47,9 @@ jobs:
           # Three-dot diff: changes introduced by the PR, ignoring base drift.
           git diff "$BASE_SHA...$HEAD_SHA" > pr.diff
 
-          agent --model composer-2.5 -p 'Review the pull request diff in ./pr.diff.
+          # --trust: acknowledge the workspace is safe to operate in.
+          # cursor-agent otherwise prompts interactively and aborts in CI.
+          agent --trust --model composer-2.5 -p 'Review the pull request diff in ./pr.diff.
           Produce a concise markdown code review:
           - Flag bugs, security issues, regressions, or broken contracts
           - Call out unclear design, naming, or hidden coupling
