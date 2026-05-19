@@ -2,16 +2,17 @@ name: CI · Backend
 
 # Single-job pipeline for the FastAPI backend service.
 #
-# Path filter on PUSH only:
-#   - Push to main with no backend/** changes → workflow doesn't run
-#     (only the changed service republishes its image to GAR).
-#   - PR to main → always runs (no PR path filter), so the required
-#     "🛡️ Backend · Scan image" branch-protection check is always posted.
-#     ~2 minutes of "wasted" CI on a frontend-only PR is the price of
-#     not needing a separate skip-stub workflow file.
+# Path filter on BOTH push AND pull_request: this workflow only fires
+# when backend/** (or this workflow file) changes. On frontend-only PRs
+# the companion ci-backend-skip.yml runs instead — it fires on the
+# inverse path filter and posts a no-op `🚀 Pipeline` check so branch
+# protection's required status stays satisfied. Without the stub,
+# GitHub would block any frontend-only PR forever waiting for a
+# `🚀 Pipeline` check that the path filter prevents from ever posting.
 #
-# Branch protection: job name "🚀 Pipeline" — if you have a required-checks
-# rule pinned to the old "🛡️ Backend · Scan image" name, update it.
+# Branch protection: job name "🚀 Pipeline" — both ci-backend.yml (real)
+# and ci-backend-skip.yml (stub) use this same job name so exactly one
+# satisfies the required check per PR.
 
 on:
   push:
@@ -21,6 +22,9 @@ on:
       - '.github/workflows/ci-backend.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
 
 env:
   # GAR repo + WIF wiring (from ProdXTF: `terraform output`).

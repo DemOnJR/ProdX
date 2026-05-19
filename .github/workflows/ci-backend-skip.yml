@@ -1,0 +1,25 @@
+name: CI · Backend (skip)
+
+# Companion to ci-backend.yml. Fires when a PR touches NO backend files
+# and posts a no-op `🚀 Pipeline` check so branch protection's required
+# status is satisfied even though the real pipeline is skipped. Without
+# this stub, GitHub would block the merge button forever waiting for an
+# expected check that the path filter prevents from ever posting.
+#
+# Job name MUST stay `🚀 Pipeline` (matching ci-backend.yml) so both
+# workflows collapse into one required-check entry in branch protection.
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+
+jobs:
+  ci:
+    name: 🚀 Pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⏭️ Skip (no backend changes)
+        run: echo "No backend changes in this PR — pipeline skipped, required check satisfied."
