@@ -44,15 +44,23 @@ The `prodx` graph rendered at the frontend is defined in [`backend/app/seed.py`]
 
 ## CI
 
-[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) builds both images and pushes to:
-- [`pbdaemon/prodx-api`](https://hub.docker.com/r/pbdaemon/prodx-api)
-- [`pbdaemon/prodx-web`](https://hub.docker.com/r/pbdaemon/prodx-web)
+Three workflows in [`.github/workflows/`](.github/workflows/):
 
-Required GitHub secrets:
-- `DOCKERHUB_USERNAME` — your Docker Hub username
-- `DOCKERHUB_TOKEN` — Docker Hub access token (Account Settings → Security → New Access Token, Read+Write+Delete)
+- [`ci-backend.yml`](.github/workflows/ci-backend.yml) — lint / test / pip-audit (PRs), Docker build + Trivy CRITICAL gate (PR + main), publish to Artifact Registry + GKE rollout (main only)
+- [`ci-frontend.yml`](.github/workflows/ci-frontend.yml) — same shape for the React + Vite frontend (tsc / vite build / npm audit on PRs)
+- [`pr-review.yml`](.github/workflows/pr-review.yml) — Cursor agent posts a markdown code review as a PR comment (best-effort, not a required check; same-repo PRs only)
 
-PRs build but don't push. Pushes to `main` push `:latest` + `:sha-xxxxxxx`. Tags `v1.2.3` push semver tags too.
+**Registry auth — no long-lived secret.** Both `ci-*` workflows mint a short-lived GCP token via Workload Identity Federation and push to Google Artifact Registry:
+- `europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-api`
+- `europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-web`
+
+Then `kubectl rollout restart` the matching deployment so GKE pulls the new `:latest`. The WIF trust binding is configured in [ProdXTF/modules/registry](https://github.com/DemOnJR/ProdXTF/tree/main/modules/registry) — see [`docs/index.html`](docs/index.html) § 06 for the full walkthrough.
+
+**Required GitHub secret:** `CURSOR` — Cursor API key, only used by `pr-review.yml`. Optional; remove the workflow if you don't want AI PR reviews.
+
+**Branch protection on `main`** (configure via Settings → Branches): require status check `🚀 Pipeline` — one entry covers both `ci-*` workflows since they share the job name.
+
+PRs build but don't push. Pushes to `main` push `:latest` + branch / sha / semver tags, then trigger a rolling restart.
 
 The web image deliberately does *not* bake `VITE_API_BASE_URL` at build time. Its nginx config proxies `/api/*` to `http://prodx-api:8000`, which resolves via Docker Compose service-name DNS locally and via Kubernetes Service DNS in the cluster — so the same image works in both environments and behind any reverse proxy (e.g. Cloudflare Tunnel) without rebuilds.
 
@@ -75,5 +83,5 @@ ProdX/
 ├── docker-compose.yml          postgres + redis + prodx-api + prodx-web
 ├── .env.example
 ├── docs/index.html             full setup tutorial (self-contained, no CDN)
-└── .github/workflows/docker-publish.yml
+└── .github/workflows/        ci-backend.yml · ci-frontend.yml · pr-review.yml
 ```
