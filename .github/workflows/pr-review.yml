@@ -18,6 +18,10 @@ on:
 jobs:
   review:
     name: 🤖 Cursor review
+    # Skip on PRs from forks. On fork PRs GitHub does not pass repo secrets
+    # (CURSOR would be empty) and GITHUB_TOKEN is read-only, so the agent
+    # call and the gh pr comment would both fail. Same-repo PRs only.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
