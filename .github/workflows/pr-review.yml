@@ -1,0 +1,64 @@
+name: PR Review · Cursor Agent
+
+# Cursor agent posts a markdown code review as a PR comment on every
+# PR open / push. Lives separately from ci-{backend,frontend}.yml so it:
+#   - Runs once per PR (not once per service pipeline)
+#   - Stays off the required-checks critical path (failures don't block merges)
+#   - Can be tuned or disabled independently of the build pipelines
+#
+# Requirements:
+#   - Repo secret CURSOR (exposed to the agent as CURSOR_API_KEY)
+#   - Default GITHUB_TOKEN with pull-requests: write (granted below)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    name: 🤖 Cursor review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # for `gh pr comment`
+    steps:
+      # fetch-depth: 0 so `git diff base...head` resolves both endpoints.
+      # The default fetch-depth: 1 would only have the PR's merge commit
+      # and the diff command would fail with "unknown revision".
+      - name: 📥 Checkout (full history for base...head diff)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 🤖 Install Cursor CLI
+        shell: bash
+        run: |
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.cursor/bin" >> $GITHUB_PATH
+
+      - name: 🤖 Run Cursor Agent review
+        shell: bash
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Three-dot diff: changes introduced by the PR, ignoring base drift.
+          git diff "$BASE_SHA...$HEAD_SHA" > pr.diff
+
+          # --trust: acknowledge the workspace is safe to operate in.
+          # cursor-agent otherwise prompts interactively and aborts in CI.
+          agent --trust --model composer-2.5 -p 'Review the pull request diff in ./pr.diff.
+          Produce a concise markdown code review:
+          - Flag bugs, security issues, regressions, or broken contracts
+          - Call out unclear design, naming, or hidden coupling
+          - Skip trivial style nits — linters/formatters handle those
+          - If everything looks good, say so in one line
+          Output only the review markdown — no preamble or sign-off.' > review.md
+
+      - name: 💬 Post review as PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR_NUMBER" --body-file review.md
