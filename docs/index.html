@@ -481,7 +481,7 @@ footer {
       <tr>
         <td>Postgres password</td>
         <td>⚠️ plaintext in <code>ProdXCD/charts/prodx/values.yaml</code></td>
-        <td>Dev-only; Postgres only listens on the cluster network. Planned hardening: External Secrets Operator + HashiCorp Vault.</td>
+        <td>Dev-only; Postgres only listens on the cluster network. For production, swap the in-chart Secret for one managed out of band, SOPS-encrypted in Git, or pulled from a managed secret store (e.g. GCP Secret Manager) via External Secrets Operator.</td>
       </tr>
       <tr>
         <td>Registry credentials (for CI image push)</td>
@@ -1343,7 +1343,7 @@ terraform apply</code></pre>
       <tr><td>Cluster type</td><td>Zonal (cheaper control plane)</td><td>Regional (HA control plane)</td></tr>
       <tr><td>HCP TF workspace</td><td><code>prodx-dev</code></td><td><code>prodx-prod</code> (separate state)</td></tr>
       <tr><td>Cloudflare hostnames</td><td><code>prodx.pbcv.dev</code> etc.</td><td><code>app.pbcv.dev</code> / <code>api.pbcv.dev</code> on a separate tunnel</td></tr>
-      <tr><td>Postgres password</td><td>plaintext in values.yaml</td><td>External Secrets Operator → HashiCorp Vault</td></tr>
+      <tr><td>Postgres password</td><td>plaintext in values.yaml</td><td>out-of-band Secret, SOPS-encrypted manifest, or External Secrets Operator pulling from a managed secret store</td></tr>
       <tr><td>Image tags Argo deploys</td><td><code>:latest</code> + <code>pullPolicy: Always</code></td><td>pinned <code>:v1.2.3</code> tags; bumped by promotion PR</td></tr>
       <tr><td>Approval to apply</td><td>any time, from your laptop</td><td>VCS-driven Remote in HCP, PR review required</td></tr>
     </tbody>
