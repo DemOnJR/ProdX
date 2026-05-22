@@ -35,13 +35,26 @@ on:
   workflow_dispatch:
 
 env:
-  # GAR repo + WIF wiring (from ProdXTF: `terraform output`).
+  # GAR repo + WIF wiring. These are NOT hardcoded: ProdXTF `envs/dev`
+  # publishes them as GitHub Actions repository variables on every
+  # `terraform apply` (see ProdXTF/envs/dev/ci_variables.tf). They change
+  # whenever the GCP project is destroyed and recreated — reading them as
+  # `vars.*` means this workflow never needs a manual edit.
+  #
+  # While the environment is destroyed the variables don't exist, so
+  # `vars.*` evaluate to '' and every publish/deploy step below is skipped
+  # via its `if:` guard — CI still runs build + Trivy scan and stays green.
+  # A later `terraform apply` recreates the variables and deploy resumes.
+  #
   # NOT secrets — security is enforced server-side by the WIF provider's
   # attribute_condition. See ProdXTF/modules/registry/main.tf.
-  IMAGE: europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-api
-  GAR_HOST: europe-west3-docker.pkg.dev
-  GCP_WIF_PROVIDER: projects/328683980484/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-  GCP_WIF_SA: gha-prodx-publisher@prodx-dev2.iam.gserviceaccount.com
+  IMAGE: ${{ vars.GAR_IMAGE_BACKEND }}
+  GAR_HOST: ${{ vars.GAR_HOST }}
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+  GCP_WIF_SA: ${{ vars.GCP_WIF_SA }}
+  GKE_CLUSTER: ${{ vars.GKE_CLUSTER }}
+  GKE_ZONE: ${{ vars.GKE_ZONE }}
   LOCAL_TAG: prodx-api:ci-scan     # local-only docker tag; never pushed
 
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"   # opt-in to Node 24 for JS actions
@@ -107,7 +120,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.IMAGE }}
+          # Falls back to a bare name when the environment is destroyed
+          # (vars.GAR_IMAGE_BACKEND unset → env.IMAGE == ''). metadata-action
+          # rejects an empty `images:`; the fallback keeps the build's OCI
+          # labels working. The push step that consumes the real GAR tags is
+          # `if:`-gated on GCP_PROJECT_ID, so the fallback is never published.
+          images: ${{ env.IMAGE || 'prodx-api' }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -140,19 +158,24 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
 
-      # ─── Publish (main push + manual dispatch) ──────────────────
+      # ─── Publish (main push + manual dispatch, when the env exists) ──
       # Re-uses the image already loaded into local docker by the build
       # step above. `docker tag` is metadata-only (zero seconds), and
       # `docker push` uploads layers directly. No buildkit, no rebuild.
+      #
+      # Every step here is gated `github.event_name != 'pull_request' &&
+      # vars.GCP_PROJECT_ID != ''`: PRs never publish, and when the GCP
+      # environment is destroyed (no repo variables) these steps skip
+      # cleanly instead of failing the run.
       - name: 🔑 Auth to GCP  ·  Workload Identity Federation
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
           service_account: ${{ env.GCP_WIF_SA }}
 
       - name: 🐳 Configure docker for GAR
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
         run: gcloud auth configure-docker ${{ env.GAR_HOST }} --quiet
 
       # Required for kubectl to authenticate to GKE clusters since GKE 1.26
@@ -162,13 +185,13 @@ jobs:
       # package. setup-gcloud installs its own gcloud + the component reliably
       # across runner images (~10-15s).
       - name: 🛠️ Install gke-gcloud-auth-plugin
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
         uses: google-github-actions/setup-gcloud@v3
         with:
           install_components: gke-gcloud-auth-plugin
 
       - name: 🚢 Tag local image + push each tag to GAR
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
         shell: bash
         run: |
           while IFS= read -r tag; do
@@ -192,9 +215,9 @@ jobs:
       # ProdXTF/modules/registry/main.tf — apply ProdXTF before merging
       # this PR or the kubectl call will get a 403.
       - name: 🔁 Roll deployment to pull the new :latest from GAR
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
         run: |
-          gcloud container clusters get-credentials prodx-dev-gke \
-            --zone europe-west3-a --project prodx-dev2
+          gcloud container clusters get-credentials "$GKE_CLUSTER" \
+            --zone "$GKE_ZONE" --project "$GCP_PROJECT_ID"
           kubectl -n prodx rollout restart deployment/prodx-api
           kubectl -n prodx rollout status deployment/prodx-api --timeout=180s
