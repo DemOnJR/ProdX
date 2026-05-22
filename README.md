@@ -213,7 +213,7 @@ Three files in [`.github/workflows/`](.github/workflows/):
 
 **Branch protection (recommended):** Settings → Branches → require the status check named `🚀 Pipeline` on `main`. One entry covers both backend & frontend CI because they share the job name.
 
-> **No long-lived secrets for image pushes.** CI authenticates to GCP via Workload Identity Federation — GitHub mints a short-lived OIDC token, GCP exchanges it for a 1-hour access token. The trust binding is in `ProdXTF/modules/registry`. The values that wire CI to your project (`GCP_WIF_PROVIDER`, `GCP_WIF_SA`, `IMAGE`) are at the top of each workflow YAML — update them to match your project after running `terraform output` in `ProdXTF/envs/dev`.
+> **No long-lived secrets for image pushes.** CI authenticates to GCP via Workload Identity Federation — GitHub mints a short-lived OIDC token, GCP exchanges it for a 1-hour access token. The trust binding is in `ProdXTF/modules/registry`. The values that wire CI to your project (`GCP_WIF_PROVIDER`, `GCP_WIF_SA`, `IMAGE`, the cluster) are **not** hardcoded — `ProdXTF/envs/dev` publishes them to this repo as **GitHub Actions variables** on every `terraform apply`, and the workflows read them as `${{ vars.* }}`. Nothing to edit by hand, even after a destroy/recreate. While the environment is down the variables are absent and the publish/deploy steps skip cleanly, so CI on `main` still passes (build + Trivy scan only).
 
 ---
 
@@ -252,7 +252,7 @@ ProdX/
 │   └── package.json
 ├── docker-compose.yml           postgres + redis + prodx-api + prodx-web
 ├── .env.example
-├── docs/index.html              long-form tutorial (self-contained, no CDN)
+├── docs/index.html              complete setup guide (self-contained, no CDN)
 └── .github/workflows/
     ├── ci-backend.yml
     ├── ci-frontend.yml
@@ -265,4 +265,4 @@ ProdX/
 
 ## Want the long version?
 
-A full walkthrough with screenshots and troubleshooting is at [`docs/index.html`](docs/index.html) — open it in a browser. Sixteen sections covering account setup through cluster verification.
+A full, beginner-friendly setup guide is at [`docs/index.html`](docs/index.html) — open it in a browser. Fourteen sections covering account setup, installing the tools, the Terraform build, verification, Argo CD, pausing/destroying, and troubleshooting.
