@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProdX — Architecture &amp; Components</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#ffffff; --ink:#1d2433; --muted:#5b6577; --faint:#8b94a7;
+    --line:#e4e7ef; --brand:#4f46e5; --brand-soft:#eef0fe;
+    --code-bg:#1e2230; --code-ink:#e8ebf2;
+    --info:#2563eb; --info-bg:#eef4ff;
+    --tip:#0f9d6e; --tip-bg:#e9f8f1;
+    --warn:#b7791f; --warn-bg:#fdf6e7;
+    --danger:#dc2626; --danger-bg:#fdecec;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--brand);}
+  code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    background:var(--brand-soft); color:#3730a3;
+    padding:.1em .38em; border-radius:5px; font-size:.9em;
+  }
+  h1,h2,h3{line-height:1.25; scroll-margin-top:80px;}
+  h2{font-size:1.5rem; margin:2.4rem 0 .4rem; padding-top:.6rem; border-top:2px solid var(--line);}
+  h3{font-size:1.13rem; margin:1.4rem 0 .3rem;}
+
+  header.top{
+    position:sticky; top:0; z-index:30;
+    background:#fff; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:.6rem; padding:.7rem 1.1rem;
+  }
+  header.top .logo{
+    width:30px;height:30px;border-radius:8px;flex:none;
+    background:linear-gradient(135deg,#4f46e5,#06b6d4);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.95rem;
+  }
+  header.top b{font-size:1rem;}
+  header.top span{color:var(--faint); font-size:.85rem;}
+  header.top .links{margin-left:auto; font-size:.85rem;}
+  header.top .links a{margin-left:1rem;}
+
+  .layout{display:flex; gap:0; max-width:1240px; margin:0 auto;}
+  nav.toc{
+    width:280px; flex:none; padding:1.4rem .8rem 3rem;
+    position:sticky; top:49px; height:calc(100vh - 49px); overflow-y:auto;
+  }
+  nav.toc .grp{font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--faint); margin:1.1rem .6rem .25rem;}
+  nav.toc a{
+    display:block; color:var(--muted); text-decoration:none;
+    padding:.32rem .6rem; border-radius:7px; font-size:.9rem;
+  }
+  nav.toc a:hover{background:var(--brand-soft); color:var(--brand);}
+  main{flex:1; min-width:0; padding:1.4rem 1.6rem 6rem; background:var(--bg);}
+
+  .hero{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed 55%,#06b6d4);
+    color:#fff; border-radius:16px; padding:1.7rem 1.8rem; margin-bottom:.5rem;
+  }
+  .hero h1{margin:.1rem 0 .5rem; font-size:1.95rem;}
+  .hero p{margin:.2rem 0; opacity:.95;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:1.05rem 1.2rem; margin:1rem 0;}
+  .card h3{margin-top:.2rem;}
+  .card .meta{display:flex; flex-wrap:wrap; gap:.4rem; margin:.4rem 0 .7rem;}
+  .pill{display:inline-block; background:var(--brand-soft); color:var(--brand);
+    border-radius:20px; padding:.05rem .65rem; font-size:.78rem; font-weight:700;}
+  .pill.cat-ci{background:#fff7ed; color:#c2410c;}
+  .pill.cat-iac{background:#eef2ff; color:#4338ca;}
+  .pill.cat-cloud{background:#ecfeff; color:#0e7490;}
+  .pill.cat-cluster{background:#f0fdf4; color:#15803d;}
+  .pill.cat-security{background:#fdf2f8; color:#9d174d;}
+  .pill.cat-edge{background:#fef3c7; color:#92400e;}
+  .pill.cat-gitops{background:#f5f3ff; color:#6d28d9;}
+
+  pre.diagram{
+    background:#0f1320; color:#cfd6e6;
+    padding:1rem 1.1rem; border-radius:10px; overflow-x:auto;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.8rem; line-height:1.45; margin:.8rem 0;
+  }
+  pre.flow{
+    background:var(--code-bg); color:var(--code-ink);
+    padding:.9rem 1rem; border-radius:10px; overflow-x:auto;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.85rem; line-height:1.55; margin:.7rem 0;
+  }
+
+  .note{border-radius:10px; padding:.75rem 1rem; margin:.85rem 0;
+    border:1px solid; font-size:.94rem;}
+  .note .lbl{font-weight:700; display:block; margin-bottom:.1rem;}
+  .note.info{background:var(--info-bg); border-color:#cfe0ff;}
+  .note.info .lbl{color:var(--info);}
+  .note.tip{background:var(--tip-bg); border-color:#bce9d5;}
+  .note.tip .lbl{color:var(--tip);}
+  .note.warn{background:var(--warn-bg); border-color:#f0e0b6;}
+  .note.warn .lbl{color:var(--warn);}
+  .note.security{background:var(--danger-bg); border-color:#f5c6c6;}
+  .note.security .lbl{color:var(--danger);}
+
+  table{border-collapse:collapse; width:100%; margin:.8rem 0; font-size:.9rem;}
+  th,td{border:1px solid var(--line); padding:.5rem .65rem; text-align:left; vertical-align:top;}
+  th{background:#f0f2f8; font-weight:700;}
+
+  ul.clean{padding-left:1.2rem;}
+  ul.clean li{margin:.25rem 0;}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:1rem;}
+  @media(max-width:900px){.two-col{grid-template-columns:1fr;}}
+
+  footer{max-width:1240px; margin:0 auto; padding:1.5rem 1.6rem 3rem;
+    color:var(--faint); font-size:.85rem; border-top:1px solid var(--line);}
+
+  @media(max-width:880px){
+    nav.toc{display:none;}
+    main{padding:1.1rem 1rem 5rem;}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="logo">PX</div>
+  <b>ProdX</b>
+  <span>Architecture &amp; Components</span>
+  <span class="links">
+    <a href="index.html">← Setup Guide</a>
+  </span>
+</header>
+
+<div class="layout">
+<nav class="toc">
+  <div class="grp">Overview</div>
+  <a href="#bigpicture">1 · The big picture</a>
+  <a href="#repos">2 · The three repositories</a>
+  <div class="grp">Each component</div>
+  <a href="#github">3 · GitHub</a>
+  <a href="#ghactions">4 · GitHub Actions (CI)</a>
+  <a href="#cursor">5 · Cursor PR review</a>
+  <a href="#dependabot">6 · Dependabot</a>
+  <a href="#hcp">7 · HCP Terraform</a>
+  <a href="#gcp">8 · Google Cloud project</a>
+  <a href="#gke">9 · GKE cluster</a>
+  <a href="#gar">10 · Artifact Registry</a>
+  <a href="#wif">11 · Workload Identity Federation</a>
+  <a href="#argocd">12 · Argo CD</a>
+  <a href="#helm">13 · Helm</a>
+  <a href="#cloudflare">14 · Cloudflare Tunnel</a>
+  <a href="#vault">15 · HashiCorp Vault</a>
+  <a href="#eso">16 · External Secrets Operator</a>
+  <a href="#trivy">17 · Trivy</a>
+  <div class="grp">How it all flows</div>
+  <a href="#cipipe">18 · The CI pipeline</a>
+  <a href="#cdpipe">19 · The CD pipeline</a>
+  <a href="#request">20 · A user request</a>
+  <a href="#secrets">21 · Secret flow</a>
+  <div class="grp">Reasoning</div>
+  <a href="#security">22 · Security at maximum</a>
+  <a href="#why">23 · Why each tool</a>
+  <a href="#cheat">24 · TL;DR cheat sheet</a>
+</nav>
+
+<main>
+
+<div class="hero">
+  <h1>ProdX — Architecture &amp; Components</h1>
+  <p>What every piece of this project is, why it's here, how they connect to
+     each other, and how the whole thing is secured end-to-end.</p>
+  <p style="font-size:.9rem;opacity:.85;">Companion to the <a href="index.html" style="color:#fff;text-decoration:underline;">step-by-step setup guide</a>.</p>
+</div>
+
+<div class="note info">
+  <span class="lbl">How to read this page</span>
+  <a href="#bigpicture">Section 1</a> shows the whole system on one screen.
+  Sections 3–17 are one card per tool — what it is, why we picked it, how it
+  plugs into the rest. Sections 18–21 are the four "journeys" that tie them
+  together. Sections 22–24 are the reasoning and a one-page cheat sheet.
+</div>
+
+<!-- ============================================================= -->
+<h2 id="bigpicture">1 · The big picture</h2>
+
+<p>Every box below is a real component. Every arrow is a real connection
+(network call, OIDC handshake, secret read, image pull, etc.). The text
+sections after this go through each one in detail.</p>
+
+<pre class="diagram">
+   ┌─────────────────────  Developer laptop  ─────────────────────┐
+   │   git push      ●     terraform apply     ●     vault login  │
+   └─────┬──────────────────────┬──────────────────────┬──────────┘
+         │                      │                      │
+         ▼                      ▼                      ▼
+ ┌──────────────────┐  ┌──────────────────┐  ┌────────────────────┐
+ │ GitHub           │  │ HCP Terraform    │  │ HashiCorp Vault    │
+ │ (3 repos)        │  │ (Terraform state)│  │ vault.YOUR-DOMAIN  │
+ │  ProdX           │  └──────────────────┘  │  secret/prodx/*    │
+ │  ProdXTF         │                        └─────┬──────────────┘
+ │  ProdXCD         │                              │ K8s auth (JWT)
+ │                  │                              │
+ │ Actions CI ──┐   │                              │
+ │  lint+tests  │   │                              │
+ │  Trivy scan  │   │                              │
+ │  build image │   │   ┌──────────  Google Cloud project  ──────────┐
+ │  WIF token   ├───┼──▶│                                            │
+ │              │   │   │  Artifact Registry                         │
+ │ Cursor       │   │   │  prodx/prodx-api : latest                  │
+ │ Dependabot   │   │   │  prodx/prodx-web : latest                  │
+ └──────┬───────┘   │   │           ▲                                │
+        │ rollout   │   │           │ pull                           │
+        │ restart   │   │           │                                │
+        └───────────┼──▶│  GKE cluster (1–2 spot e2-medium nodes)    │
+                    │   │  ┌──────────────────────────────────────┐  │
+                    │   │  │ argocd       Argo CD ─┐              │  │
+                    │   │  │                       │ syncs        │  │
+                    │   │  │                       ▼              │  │
+                    │   │  │ prodx        api · web · pg · redis  │  │
+                    │   │  │              (Postgres pwd ◀─┐)      │  │
+                    │   │  │                              │       │  │
+                    │   │  │ external-    ESO ────────────┘       │  │
+                    │   │  │ secrets       │ K8s-auth JWT         │  │
+                    │   │  │               └─▶ reads Vault        │  │
+                    │   │  │                                      │  │
+                    │   │  │ cloudflared   cloudflared pod ─┐     │  │
+                    │   │  └────────────────────────────────┼─────┘  │
+                    │   └─────────────────────────────────────┼──────┘
+                    │                                         │
+                    │                                         │ outbound HTTPS only
+                    │                                         ▼
+                    │                          ┌────────────────────────────┐
+                    │                          │     Cloudflare edge        │
+                    │                          │     argocd.YOUR-DOMAIN     │
+                    │                          │     prodx.YOUR-DOMAIN      │
+                    │                          │     prodxapi.YOUR-DOMAIN   │
+                    │                          └────────────┬───────────────┘
+                    │                                       │ HTTPS
+                    │                                       ▼
+                    └────────────────────────────────── End user
+</pre>
+
+<div class="note tip">
+  <span class="lbl">The shape, in one sentence</span>
+  Code lives in <b>GitHub</b>; <b>GitHub Actions</b> builds and ships images to a private <b>Artifact Registry</b>;
+  <b>Argo CD</b> running on a <b>GKE</b> cluster syncs them according to a Helm chart;
+  the cluster pulls runtime secrets from <b>Vault</b> via <b>ESO</b>; and traffic reaches it over a
+  <b>Cloudflare Tunnel</b> — with no long-lived credentials anywhere.
+</div>
+
+<!-- ============================================================= -->
+<h2 id="repos">2 · The three repositories</h2>
+
+<p>The project deliberately splits into three git repositories. Each one has a
+single job and a different reason to change. Mixing them in one repo is the
+classic "monorepo soup" mistake that makes blast radius huge and reviews
+painful.</p>
+
+<table>
+  <tr><th>Repo</th><th>Holds</th><th>Changes when…</th><th>Affects</th></tr>
+  <tr><td><b>ProdX</b></td><td>The app: FastAPI backend + React frontend + Dockerfiles + CI workflows + this documentation site.</td>
+      <td>A developer ships a feature or bug fix.</td>
+      <td>New container images get built and rolled out.</td></tr>
+  <tr><td><b>ProdXTF</b></td><td>Terraform code for every cloud resource: GCP project, GKE, VPC, Artifact Registry, WIF, Cloudflare tunnel, Vault wiring, GitHub branch protection.</td>
+      <td>The infrastructure shape changes (new module, sizing, regions, IAM).</td>
+      <td>Cloud resources get created / changed / destroyed.</td></tr>
+  <tr><td><b>ProdXCD</b></td><td>The Helm chart describing what runs inside the cluster: Deployments, Services, ConfigMaps, ExternalSecrets, ClusterSecretStore.</td>
+      <td>Workload shape changes (replicas, env vars, resource limits, new K8s objects).</td>
+      <td>Argo CD reconciles the cluster to match.</td></tr>
+</table>
+
+<div class="note info">
+  <span class="lbl">Why this matters for security and operations</span>
+  Application code can be reviewed by app devs; infra by SREs; cluster
+  manifests by platform engineers. Each repo gets its own branch-protection
+  rules, its own required reviewers, its own CI. A bad pull request in one
+  cannot directly compromise the others.
+</div>
+
+<!-- ============================================================= -->
+<h2 id="github">3 · GitHub</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill">Source of truth</span><span class="pill cat-gitops">GitOps</span></div>
+  <p><b>What:</b> Git hosting + collaboration platform. Holds the three repos, runs Actions CI, hosts releases and Dependabot PRs.</p>
+  <p><b>Why:</b> Git is the immutable record of <i>what should be deployed</i> — both the application code and the desired cluster state. Argo CD literally reads from GitHub to know what to run; nothing is "configured by clicking in a dashboard."</p>
+  <p><b>How it connects:</b></p>
+  <ul class="clean">
+    <li>Developer pushes → GitHub stores commits, runs Actions workflows.</li>
+    <li>GitHub OIDC issues short-lived JWTs to CI jobs → Google Cloud accepts them via WIF.</li>
+    <li>Argo CD polls the <code>ProdXCD</code> repo (HTTPS, read-only) for the Helm chart.</li>
+    <li>Terraform's <code>github</code> provider sets branch protection + repo variables.</li>
+  </ul>
+  <p class="meta"><span class="pill cat-security">Security</span></p>
+  <ul class="clean">
+    <li><b>Branch protection on <code>main</code></b> for all three repos: no force-push, no deletion, required CI check, optional PR reviews. Managed in Terraform — not click-driven.</li>
+    <li><b>Fine-grained Personal Access Tokens</b> with the minimum scopes; no classic admin keys.</li>
+    <li><b>Forks can't push images</b>: the WIF provider's <code>attribute_condition</code> rejects OIDC tokens whose <code>repository</code> claim doesn't match exactly <code>OWNER/REPO</code>.</li>
+  </ul>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="ghactions">4 · GitHub Actions (CI)</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-ci">CI</span></div>
+  <p><b>What:</b> The build &amp; ship pipeline. Two main workflows (<code>ci-backend.yml</code>, <code>ci-frontend.yml</code>) plus skip-stubs and an optional Cursor review.</p>
+  <p><b>Why:</b> Every change goes through the same scripted gate. Humans don't push to <code>:latest</code>; the workflow does, with a fresh OIDC token each run.</p>
+  <p><b>On a pull request</b> it runs:</p>
+  <ul class="clean">
+    <li>Lint (<code>ruff</code>) + tests (<code>pytest</code>) + dependency audit (<code>pip-audit</code> / <code>npm audit</code>).</li>
+    <li>Docker build (multi-stage, OCI-labelled).</li>
+    <li><b>Trivy scan</b> of the built image — fails the build on any <i>fixable CRITICAL</i> CVE.</li>
+    <li>The Cursor agent posts a review comment (optional, non-blocking).</li>
+  </ul>
+  <p><b>On a push to <code>main</code></b> it additionally:</p>
+  <ul class="clean">
+    <li>Authenticates to Google Cloud via <b>Workload Identity Federation</b> — no stored key.</li>
+    <li>Pushes the image to Artifact Registry under <code>main</code>, <code>sha-XXXX</code>, and <code>latest</code>.</li>
+    <li>Runs <code>kubectl rollout restart</code> against the cluster so pods re-pull <code>:latest</code>.</li>
+  </ul>
+  <p><b>Path filters</b> keep things efficient: a backend-only change only fires the backend pipeline; a frontend-only change only fires the frontend pipeline. The "skip" stubs satisfy branch-protection's required check when the other side is untouched.</p>
+  <p><b>Deploy coordinates are NOT hardcoded.</b> <code>GCP_PROJECT_ID</code>, <code>GCP_WIF_PROVIDER</code>, <code>GCP_WIF_SA</code>, <code>GAR_HOST</code>, image repos, cluster, zone — all come from GitHub Actions repository variables written by <code>ProdXTF/envs/dev</code>. The workflow reads them as <code>${{ vars.* }}</code>; a destroy/recreate just re-publishes them. While the environment is destroyed, the variables are absent and the publish/deploy steps skip cleanly — CI stays green on build + scan.</p>
+  <p class="meta"><span class="pill cat-security">Security</span></p>
+  <ul class="clean">
+    <li>No long-lived service-account key — WIF mints a 1-hour token per run.</li>
+    <li>Trivy gates merges on CRITICAL CVEs with a known fix.</li>
+    <li><code>pr-review.yml</code> is forks-blocked: forked PRs don't get repo secrets and the agent skips them.</li>
+  </ul>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="cursor">5 · Cursor PR review (AI second opinion)</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-ci">CI</span></div>
+  <p><b>What:</b> An automated AI code review that posts a markdown comment on every same-repo pull request, flagging bugs / regressions / unclear design.</p>
+  <p><b>Why:</b> A cheap extra pair of eyes. It does not block merges (it's intentionally off the required-checks path); a human reviewer is still the gate.</p>
+  <p><b>How it connects:</b> <code>pr-review.yml</code> installs <code>cursor-agent</code>, generates a three-dot diff of the PR, and asks the agent for a concise review. It uses the <code>CURSOR</code> GitHub Actions secret — set by Terraform from the Vault path <code>secret/prodx/cursor</code> when <code>set_cursor_secret = true</code>.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="dependabot">6 · Dependabot</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-ci">CI</span><span class="pill cat-security">Supply-chain</span></div>
+  <p><b>What:</b> GitHub's bot that watches dependency manifests (<code>requirements.txt</code>, <code>package.json</code>, GitHub Action versions) and opens PRs when a newer version is available — especially when a known CVE is fixed upstream.</p>
+  <p><b>Why:</b> Stale dependencies are the most common breach vector. Dependabot turns "we should update someday" into "there's a PR ready and CI proved it builds." Combined with Trivy's CRITICAL-CVE gate, the project stays patched almost by itself.</p>
+  <p><b>How it connects:</b> Config lives at <code>ProdX/.github/dependabot.yml</code>. Dependabot opens a PR → that PR runs the same Actions CI (build + Trivy scan) → if green, a human merges. Every recent commit titled <code>chore(deps): bump …</code> in the log is one of these.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="hcp">7 · HCP Terraform</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-iac">IaC</span></div>
+  <p><b>What:</b> HashiCorp's hosted Terraform state backend. We use it for two workspaces (<code>prodx-bootstrap</code> and <code>prodx-dev</code>) with <b>Execution Mode = Local</b>: state lives in HCP, but <code>terraform apply</code> runs on your laptop with your local credentials.</p>
+  <p><b>Why local execution?</b> Remote runs would need HCP's servers to hold your <code>gcloud</code>, <code>vault</code> and <code>kubectl</code> tokens — that's exactly the secret sprawl we're avoiding. Local exec keeps credentials on your laptop and uses HCP only for the (encrypted, version-locked, team-safe) state file.</p>
+  <p><b>Why state in HCP at all?</b> A <code>tfstate</code> committed to Git is a recipe for losing or leaking state. HCP locks it, versions it, and lets multiple people collaborate later without stomping each other.</p>
+  <p><b>Sub-workspaces with local state:</b> <code>tfc-bootstrap</code>, <code>github-bootstrap</code> and <code>vault-bootstrap</code> are one-time bootstraps that keep state on disk — they configure the things HCP and the rest depend on, so they can't depend on them in turn.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="gcp">8 · Google Cloud project</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-cloud">Cloud</span></div>
+  <p><b>What:</b> A dedicated GCP project (e.g. <code>prodx-dev3</code>) that owns the cluster, network, Artifact Registry repo, and service accounts. Created by <code>envs/bootstrap</code>.</p>
+  <p><b>Why an isolated project?</b> A project is GCP's blast-radius boundary — IAM, quotas, billing and auditing are all per-project. Anything wrong in this project (a runaway pod, a leaked SA key, a billing surprise) is contained to the project; nothing else in your Google account is touched.</p>
+  <p><b>How it connects:</b> Terraform turns on exactly the APIs we need (compute, container, IAM, Artifact Registry, IAM Credentials, STS) and grants narrowly-scoped roles. The 30-day project-id reservation on delete is why <a href="index.html#destroy">destroy/recreate</a> picks a fresh id.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="gke">9 · GKE cluster (Kubernetes)</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-cluster">Cluster</span></div>
+  <p><b>What:</b> A zonal Google Kubernetes Engine cluster — 1 to 3 small Spot VMs, autoscaling, with <b>Workload Identity</b> enabled at the cluster level.</p>
+  <p><b>Why GKE specifically?</b></p>
+  <ul class="clean">
+    <li>Managed control plane — no etcd to babysit.</li>
+    <li>Cluster-level <b>Workload Identity</b> ties K8s ServiceAccounts to GCP service accounts without static JSON keys (used here for pull access from the node SA to Artifact Registry).</li>
+    <li>Spot VMs are 60–80% cheaper than on-demand and fine for a dev / capstone cluster — autoscaling masks preemptions.</li>
+  </ul>
+  <p><b>What runs inside:</b></p>
+  <ul class="clean">
+    <li><code>argocd</code> namespace — the Argo CD installation.</li>
+    <li><code>prodx</code> namespace — the application (api, web, postgres, redis).</li>
+    <li><code>external-secrets</code> namespace — ESO controller.</li>
+    <li><code>cloudflared</code> namespace — the tunnel connector pods (outbound only).</li>
+    <li><code>vault-auth</code> namespace — a reviewer ServiceAccount Vault uses to validate other pods' JWTs.</li>
+  </ul>
+  <p class="meta"><span class="pill cat-security">Security</span></p>
+  <ul class="clean">
+    <li>Private VPC; no public IPs on nodes; outbound via Cloud NAT.</li>
+    <li>No public LoadBalancer — Services are <code>ClusterIP</code>; ingress is the Cloudflare Tunnel (outbound).</li>
+    <li>Per-repo Artifact Registry IAM (the node SA gets read on <i>this</i> repo only).</li>
+  </ul>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="gar">10 · Artifact Registry</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-cloud">Cloud</span></div>
+  <p><b>What:</b> Google's private container registry. One repo (<code>prodx</code>) holds two images (<code>prodx-api</code>, <code>prodx-web</code>) tagged with <code>main</code>, <code>sha-XXXX</code> and <code>latest</code>.</p>
+  <p><b>Why private (over Docker Hub)?</b> Replaces the last long-lived secret in CI (Docker Hub PAT). Also keeps the images private — they ship to your cluster, not to the public Internet.</p>
+  <p><b>How it connects:</b></p>
+  <ul class="clean">
+    <li><b>CI push:</b> the <code>gha-prodx-publisher</code> service account has <code>artifactregistry.writer</code> on the repo. CI impersonates it via WIF.</li>
+    <li><b>GKE pull:</b> the cluster's default compute SA has <code>artifactregistry.reader</code> on the same repo. Pulls require no <code>imagePullSecret</code>.</li>
+    <li><b>Cleanup policy:</b> untagged layers older than 30 days are GC'd; tagged images stay forever for incident forensics.</li>
+  </ul>
+  <p>The image path embeds the GCP project id, which changes on every destroy/recreate — that's why <code>ProdXCD/values.yaml</code> only carries a placeholder and the Argo CD Application overrides it with a Helm parameter built from the live registry module.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="wif">11 · Workload Identity Federation (WIF)</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-security">Security</span></div>
+  <p><b>What:</b> The trust binding that lets GitHub Actions get a short-lived GCP token <b>without</b> any stored service-account key.</p>
+  <p><b>Why:</b> A JSON SA key in <code>secrets.GCP_SA_KEY</code> is a long-lived credential — a leak compromises every run forever. WIF gives each CI run a 5-minute OIDC JWT that GCP exchanges for a 1-hour access token. There's no key to steal.</p>
+  <p><b>How the handshake works:</b></p>
+  <pre class="flow">GitHub runner ─(1) requests OIDC token─▶ token.actions.githubusercontent.com
+                                            (signs a JWT: sub, repository, ref, workflow)
+GitHub runner ─(2) passes JWT────────────▶ GCP STS (workload identity pool provider)
+                                            ▲
+                                            │ attribute_condition CEL:
+                                            │   assertion.repository == "OWNER/REPO"
+                                            │ → rejects forks and other repos
+                                            ▼
+GCP STS      ─(3) returns federated token─▶ runner
+GCP STS      ─(4) impersonates SA──────────▶ gha-prodx-publisher@PROJECT.iam.gserviceaccount.com
+                                              (1-hour access token; only artifactregistry.writer
+                                               on the prodx repo + container.developer on the project)</pre>
+  <p>Reference impl: <code>ProdXTF/modules/registry/main.tf</code>. The pool id now carries a random suffix per generation so a destroy/recreate never collides with GCP's 30-day soft-delete.</p>
+  <p class="meta"><span class="pill cat-security">Security</span></p>
+  <ul class="clean">
+    <li>The single biggest line in the module is the <code>attribute_condition</code> — without it, any GitHub Actions workflow on the entire planet could request a token from this provider.</li>
+    <li>The publisher SA has writer on <b>one</b> Artifact Registry repo, not the project. Worst-case blast radius is "1 hour of pushes to <code>prodx</code>."</li>
+    <li>Revocation = remove an IAM binding. No "rotate the key everywhere."</li>
+  </ul>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="argocd">12 · Argo CD</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-gitops">GitOps</span></div>
+  <p><b>What:</b> A controller running in the cluster that <b>continuously reconciles</b> what's deployed against a Helm chart in a Git repo. The Git repo is the source of truth; if you change the cluster by hand, Argo CD changes it back.</p>
+  <p><b>Why GitOps?</b></p>
+  <ul class="clean">
+    <li><b>Audit trail.</b> Every change is a Git commit. No "who changed this in <code>kubectl</code> at 3am?"</li>
+    <li><b>Repeatability.</b> Rebuild the cluster, point Argo at the same repo, get the same workloads back.</li>
+    <li><b>Drift detection.</b> A misconfigured pod or a manual fix is visible in the UI as <i>OutOfSync</i> until it's reconciled.</li>
+    <li><b>Self-healing.</b> Delete a pod by accident — Argo recreates it.</li>
+  </ul>
+  <p><b>How it's wired:</b> Terraform installs the Argo Helm chart and creates a single <i>root Application</i> CR pointing at <code>ProdXCD/charts/prodx</code>. From there, Argo CD owns the cluster's state.</p>
+  <p><b>Image repo override:</b> Argo's root Application injects the current GCP project's Artifact Registry path as a Helm parameter, so the chart in Git stays project-agnostic.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="helm">13 · Helm</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-cluster">Cluster</span></div>
+  <p><b>What:</b> A templating system for Kubernetes manifests. The <code>ProdXCD</code> repo is one Helm chart; <code>values.yaml</code> is its tunables (replicas, images, resource limits…).</p>
+  <p><b>Why:</b> Helm gives us one place to bump the API replica count, change a CORS origin, swap a postgres image — without editing six raw YAML files. Argo CD renders the chart on every sync.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="cloudflare">14 · Cloudflare Tunnel</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-edge">Edge</span><span class="pill cat-security">Security</span></div>
+  <p><b>What:</b> A reverse proxy that exposes in-cluster services on real HTTPS URLs <b>without giving the cluster any public IP or open inbound port</b>. The <code>cloudflared</code> pod inside the cluster dials out to Cloudflare's edge; the edge relays incoming HTTPS requests down that outbound connection.</p>
+  <p><b>Why:</b></p>
+  <ul class="clean">
+    <li>Zero managed certificates — Cloudflare handles TLS at the edge.</li>
+    <li>Zero attack surface — the cluster doesn't <i>listen</i> on the public Internet at all.</li>
+    <li>No GCP LoadBalancer cost (those are $18+/mo each).</li>
+  </ul>
+  <p><b>How it connects:</b> Terraform creates the tunnel, three proxied DNS CNAMEs (<code>argocd</code>, <code>prodx</code>, <code>prodxapi</code> on your apex domain) and the ingress config (which hostname routes to which in-cluster Service). The tunnel run-token is generated by Terraform and mounted into the cloudflared pod as a K8s Secret.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="vault">15 · HashiCorp Vault</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-security">Security</span></div>
+  <p><b>What:</b> A separate Vault server (this project uses <code>vault.YOUR-DOMAIN</code>) that stores every runtime secret: the Postgres password, the Cloudflare API token, the GitHub PAT, the Cursor key.</p>
+  <p><b>Why a dedicated secret store?</b></p>
+  <ul class="clean">
+    <li><b>Rotation.</b> Change the Postgres password in Vault — the cluster picks it up on the next ESO refresh. No rebuild, no Git commit, no plaintext leak.</li>
+    <li><b>Auditable reads.</b> Vault logs every secret access.</li>
+    <li><b>Encryption.</b> Secrets are sealed at rest; only auth'd identities can read.</li>
+  </ul>
+  <p><b>How it connects:</b></p>
+  <ul class="clean">
+    <li><b>Terraform on your laptop</b> reads tokens with <code>data.vault_kv_secret_v2</code> using your <code>vault login</code> token. Used at apply time only.</li>
+    <li><b>ESO inside the cluster</b> authenticates using the K8s Service Account JWT and a Vault role bound to the <code>prodx-app-read</code> policy.</li>
+  </ul>
+  <p>Trust is set up by <code>envs/vault-bootstrap</code>: it enables Vault's Kubernetes auth method, points it at the cluster's API server, and creates the <code>prodx-eso</code> role.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="eso">16 · External Secrets Operator (ESO)</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-cluster">Cluster</span><span class="pill cat-security">Security</span></div>
+  <p><b>What:</b> A Kubernetes controller that pulls secrets from an external store (Vault, in our case) and materializes them as native K8s <code>Secret</code> objects.</p>
+  <p><b>Why not just embed secrets in the Helm chart?</b> Because anything in a chart sits in Git. ESO keeps the chart secret-free — it just contains an <code>ExternalSecret</code> CR that says "pull <code>secret/prodx/postgres</code> from Vault and create a K8s Secret named <code>postgres-credentials</code>." The actual value never lives in Git.</p>
+  <p><b>How it connects:</b></p>
+  <pre class="flow">  ESO pod ───(1) reads its own SA JWT─────────────▶ Kubernetes API
+  ESO pod ───(2) sends JWT to /v1/auth/kubernetes─▶ Vault
+  Vault    ───(3) TokenReview against cluster API─▶ Kubernetes API
+                                                     │
+                                                     ▼ valid → role: prodx-eso
+  Vault    ───(4) returns short-lived token───────▶ ESO pod
+  ESO pod  ───(5) reads secret/prodx/postgres─────▶ Vault
+  ESO pod  ───(6) creates/updates K8s Secret──────▶ Kubernetes API
+  Postgres ───(7) mounts Secret as env vars────── done.</pre>
+  <p>Refresh interval is 1 hour, so a rotation in Vault propagates within the hour with no pod restart.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="trivy">17 · Trivy</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-security">Security</span></div>
+  <p><b>What:</b> A vulnerability scanner that inspects a container image's OS packages and language dependencies for known CVEs.</p>
+  <p><b>Why:</b> The package-audit step (<code>pip-audit</code>, <code>npm audit</code>) only sees what's in your direct dependencies. Trivy also catches CVEs in the <i>base image</i> — the FastAPI Dockerfile inherits from <code>python:3.12-slim</code>, the nginx image from <code>nginx:alpine</code>, and base images get new CVEs constantly.</p>
+  <p><b>How it's gated:</b> CI runs <code>trivy image</code> with <code>severity: CRITICAL</code> and <code>ignore-unfixed: true</code>. A merge is blocked only when there's a <i>fixable</i> CRITICAL CVE — i.e. the upstream package has a patch and we just haven't picked it up yet. This avoids the "every PR fails because alpine has 700 unfixed CVEs" trap.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="cipipe">18 · The CI pipeline — from commit to image</h2>
+
+<pre class="flow">  Developer
+     │ git push
+     ▼
+  GitHub (branch protection: PR required, status check required)
+     │ workflow trigger (path-filtered: backend/** or frontend/**)
+     ▼
+  GitHub Actions runner (Ubuntu, ephemeral VM)
+     │
+     ├─ 📥  checkout
+     │
+     ├─ 🔍  lint (ruff) / typecheck (tsc)            ─┐
+     ├─ 🧪  tests (pytest) / build (vite)             │ on PR
+     ├─ 🔐  dependency audit (pip-audit / npm audit) ─┘
+     │
+     ├─ 🐳  docker build (multi-stage, OCI labels)
+     ├─ 🛡️  Trivy CRITICAL scan      ◀── blocks merge on fixable CRITICAL CVE
+     │
+     │       (the steps below only run on push to main / manual dispatch,
+     │        AND only when GCP_PROJECT_ID is published — i.e. the
+     │        environment exists. With no env they skip cleanly.)
+     │
+     ├─ 🔑  google-github-actions/auth (WIF — no stored key)
+     ├─ 🐳  gcloud auth configure-docker
+     ├─ 🚢  docker tag + push   ──────────────▶ Artifact Registry
+     └─ 🔁  kubectl rollout restart deploy/prodx-{api,web}
+                       │
+                       ▼
+                   GKE cluster picks up the new image
+                   (imagePullPolicy: Always re-pulls :latest)</pre>
+
+<p>Every step is conditional, and the conditions are why the pipeline is robust:</p>
+<ul class="clean">
+  <li><b>PR vs push:</b> quality checks run on PRs and manual dispatches; the publish/deploy steps don't.</li>
+  <li><b>Env present vs absent:</b> publish/deploy ALSO gate on <code>vars.GCP_PROJECT_ID != ''</code>. While Terraform has destroyed the env, those variables are empty and the steps skip — so CI stays green on build + scan even when there's no cluster.</li>
+  <li><b>Backend vs frontend:</b> path filters route a touch in <code>backend/**</code> to only the backend workflow. The companion skip-stubs satisfy branch protection's required check name.</li>
+</ul>
+
+<!-- ============================================================= -->
+<h2 id="cdpipe">19 · The CD pipeline — from image to running pod</h2>
+
+<p>There are two complementary delivery loops. CI does the <b>push</b>; Argo CD
+does the <b>pull</b>.</p>
+
+<pre class="flow">  (1) Image-tag loop (per code change)
+      CI pushes prodx-api:latest, :sha-XXX  ─▶ Artifact Registry
+      CI runs `kubectl rollout restart deploy/prodx-api`
+         │
+         ▼
+      Kubernetes creates new pods; imagePullPolicy: Always
+      re-pulls :latest, which now resolves to the new digest.
+
+  (2) Chart-state loop (per chart change in ProdXCD)
+      Edit ProdXCD/values.yaml or template, push to main
+         │
+         ▼
+      Argo CD polls the repo, detects drift, runs `helm template`
+         │
+         ▼
+      Argo CD applies the rendered manifests to the cluster.
+      ApplicationSet.status flips Synced/Healthy.</pre>
+
+<p>The two loops are independent on purpose: an app developer ships code without ever touching cluster YAML, and a platform engineer changes cluster shape without ever rebuilding an image.</p>
+
+<!-- ============================================================= -->
+<h2 id="request">20 · A user request — end to end</h2>
+
+<pre class="flow">    Browser
+       │  HTTPS GET https://prodx.YOUR-DOMAIN/
+       ▼
+    Cloudflare edge (anycast IP)
+       │  TLS terminated, request matched to the prodx tunnel
+       │  routed via the established outbound tunnel connection
+       ▼
+    cloudflared pod (inside the cluster, no inbound port open)
+       │  hostname → in-cluster Service
+       ▼
+    Service: prodx-web (ClusterIP) → nginx pod
+       │
+       │  If the path is /api/* :
+       ▼  nginx proxy_pass → http://prodx-api:8000 (in-cluster DNS)
+            │
+            ▼
+        Service: prodx-api → FastAPI pod
+            │
+            ├──▶ Postgres (postgres-credentials Secret materialized by ESO from Vault)
+            └──▶ Redis (cache)</pre>
+
+<p>Critical: <b>no public IP</b> reaches the cluster. The cloudflared connection is initiated <i>from inside</i> the cluster outbound. Cloudflare's edge knows where to send a request; nothing on the public Internet can dial the cluster directly.</p>
+
+<!-- ============================================================= -->
+<h2 id="secrets">21 · Secret flow — where each secret lives, who reads it</h2>
+
+<table>
+  <tr><th>Secret</th><th>Lives in</th><th>Read by</th><th>Lifetime</th></tr>
+  <tr><td>Google Cloud user creds (laptop)</td><td><code>~/.config/gcloud/</code></td><td>Terraform &amp; kubectl on your laptop</td><td>Refresh tokens (long)</td></tr>
+  <tr><td>GCP credentials for CI</td><td><b>nowhere</b> — OIDC + WIF</td><td>GitHub Actions mints fresh per run</td><td>1 hour per run</td></tr>
+  <tr><td>HCP Terraform token</td><td><code>~/.terraform.d/credentials.tfrc.json</code></td><td>Terraform CLI</td><td>Long-lived (revoke in HCP UI)</td></tr>
+  <tr><td>Vault token (laptop)</td><td><code>~/.vault-token</code></td><td>Terraform's <code>vault</code> provider</td><td>~32 days (configurable)</td></tr>
+  <tr><td>Postgres password</td><td>Vault: <code>secret/prodx/postgres</code></td><td>ESO → K8s Secret → Postgres &amp; API pods</td><td>Rotate any time in Vault</td></tr>
+  <tr><td>Cloudflare API token</td><td>Vault: <code>secret/prodx/cloudflare</code></td><td>Terraform on apply (Mode B)</td><td>Rotate in Cloudflare dashboard</td></tr>
+  <tr><td>GitHub PAT</td><td>Vault: <code>secret/prodx/github</code></td><td>Terraform on apply (Mode B)</td><td>Rotate in GitHub settings</td></tr>
+  <tr><td>Cursor API key</td><td>Vault: <code>secret/prodx/cursor</code> → GitHub <code>CURSOR</code> secret</td><td><code>pr-review.yml</code></td><td>Rotate in Cursor</td></tr>
+  <tr><td>Cloudflare tunnel run token</td><td>Generated by Terraform, mounted as K8s Secret</td><td>cloudflared pod</td><td>Tied to the tunnel resource</td></tr>
+  <tr><td>Argo CD initial admin password</td><td>K8s Secret (deleted after first login)</td><td>You once, then never</td><td>Rotate via UI</td></tr>
+</table>
+
+<div class="note tip">
+  <span class="lbl">The pattern</span>
+  Long-lived secrets live in <b>Vault</b> (which encrypts at rest, audits reads, and supports rotation).
+  Short-lived secrets are minted on demand (OIDC JWTs, GCP federated tokens, Vault-issued K8s-auth tokens).
+  Nothing sensitive ever lives in Git.
+</div>
+
+<!-- ============================================================= -->
+<h2 id="security">22 · Security at maximum — what makes this hard to attack</h2>
+
+<div class="two-col">
+  <div class="card">
+    <h3>Identity &amp; access</h3>
+    <ul class="clean">
+      <li><b>No long-lived cloud keys.</b> WIF + GitHub OIDC for CI; Workload Identity for nodes; Vault-issued K8s auth tokens for ESO.</li>
+      <li><b>Repo-scoped trust.</b> WIF rejects OIDC tokens whose <code>repository</code> claim doesn't match — forks cannot push.</li>
+      <li><b>Least-privilege IAM.</b> Publisher SA: writer on <i>one</i> AR repo. Node SA: reader on <i>one</i> AR repo. No project-wide grants beyond <code>container.developer</code> (needed for rollout restart).</li>
+      <li><b>Fine-grained PATs.</b> The GitHub token has Variables, Administration, Actions, Metadata — not <code>repo</code> god-mode.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Supply chain</h3>
+    <ul class="clean">
+      <li><b>Trivy CRITICAL gate</b> on every image build.</li>
+      <li><b>Dependabot</b> raises PRs the moment an upstream fix lands.</li>
+      <li><b>Private registry.</b> Images never go to a public hub.</li>
+      <li><b>Pinned provider + chart versions</b> in Terraform.</li>
+      <li><b>Cursor PR review</b> as a non-blocking second opinion.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Network</h3>
+    <ul class="clean">
+      <li><b>No public IP</b> on the cluster. Inbound traffic only via the Cloudflare Tunnel (outbound).</li>
+      <li><b>TLS terminated at Cloudflare</b> — no certificate management on the cluster.</li>
+      <li><b>ClusterIP services only;</b> nothing of type LoadBalancer or NodePort exposed.</li>
+      <li><b>Private VPC + Cloud NAT</b> for outbound from the nodes.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>State &amp; secrets</h3>
+    <ul class="clean">
+      <li><b>State in HCP</b>, locked + versioned; never in Git.</li>
+      <li><b>Secrets in Vault</b>, never in Git. <code>*.tfvars</code> is git-ignored.</li>
+      <li><b>ESO reads with a 1h-TTL Vault token,</b> per-namespace, per-SA.</li>
+      <li><b>Rotation by editing Vault</b> — no commits, no re-deploys.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Code &amp; review</h3>
+    <ul class="clean">
+      <li><b>Branch protection on <code>main</code></b> for all three repos.</li>
+      <li><b>Required CI check</b> (<code>🚀 Pipeline</code>) before merge.</li>
+      <li><b>No force-push, no branch deletion.</b></li>
+      <li><b>PR-review.yml</b> is fork-gated so a malicious fork can't exfiltrate secrets via a workflow change.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Blast radius</h3>
+    <ul class="clean">
+      <li><b>Dedicated GCP project</b> — billing, IAM, audit all contained.</li>
+      <li><b>Per-repo IAM bindings,</b> not project-wide.</li>
+      <li><b>Cluster-wide deletes</b> require both deletion-protection off AND a Terraform action.</li>
+      <li><b>Vault secrets soft-deleted</b> (KV-v2 versions); recoverable.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="note security">
+  <span class="lbl">What we deliberately did NOT do (and why it's OK here)</span>
+  No mTLS service mesh, no OPA policies, no signed images (cosign), no node
+  attestation, no private GKE control-plane endpoint. These are real and
+  reasonable for prod — but this is a capstone / dev setup where they'd add
+  complexity without an attacker who'd notice. The architecture is structured
+  so any of them can be added later without rewriting what's here.
+</div>
+
+<!-- ============================================================= -->
+<h2 id="why">23 · Why each tool (vs. the obvious alternative)</h2>
+
+<table>
+  <tr><th>We picked</th><th>Instead of</th><th>Because</th></tr>
+  <tr><td>GKE Standard, Spot, zonal</td><td>GKE Autopilot / regional</td><td>Cheapest config that still gives us Workload Identity + autoscaling.</td></tr>
+  <tr><td>Argo CD</td><td>Flux / no GitOps</td><td>Beautiful UI for non-DevOps reviewers; widest community.</td></tr>
+  <tr><td>Helm</td><td>Kustomize / raw YAML</td><td>Native parameter overrides — perfect for Argo CD's per-env injection.</td></tr>
+  <tr><td>Artifact Registry</td><td>Docker Hub / GHCR</td><td>No long-lived registry credential in CI (paired with WIF).</td></tr>
+  <tr><td>Workload Identity Federation</td><td>JSON service-account key</td><td>Zero long-lived credentials; revocation is a one-line IAM change.</td></tr>
+  <tr><td>HashiCorp Vault + ESO</td><td>K8s Secrets / Sealed Secrets</td><td>Real rotation, real audit log, central store for non-cluster secrets too.</td></tr>
+  <tr><td>Cloudflare Tunnel</td><td>GCP LoadBalancer + cert-manager</td><td>$0 vs. ~$18/mo per LB; no cert management; no public IP exposed.</td></tr>
+  <tr><td>HCP Terraform local exec</td><td>HCP remote runs</td><td>Local creds stay local; HCP only holds the state file.</td></tr>
+  <tr><td>Three separate repos</td><td>Monorepo</td><td>Per-repo branch protection, reviewers, blast radius.</td></tr>
+  <tr><td>Trivy in CI</td><td>Image-registry scanning</td><td>Catches CVEs <i>before</i> the image lands in the registry, blocks the PR.</td></tr>
+  <tr><td>Dependabot</td><td>Manual quarterly upgrades</td><td>PRs are continuous; CI proves each one is safe.</td></tr>
+</table>
+
+<!-- ============================================================= -->
+<h2 id="cheat">24 · TL;DR cheat sheet</h2>
+
+<table>
+  <tr><th>Component</th><th>One-liner</th></tr>
+  <tr><td>GitHub</td><td>Code repos + Actions runner + branch-protected source of truth.</td></tr>
+  <tr><td>GitHub Actions</td><td>Builds images, scans them with Trivy, pushes via WIF, rolls the deployment.</td></tr>
+  <tr><td>Cursor</td><td>Posts an AI code-review comment on each PR.</td></tr>
+  <tr><td>Dependabot</td><td>Opens PRs to bump dependencies; CI proves each bump is safe.</td></tr>
+  <tr><td>HCP Terraform</td><td>Stores Terraform state safely; apply runs locally on your laptop.</td></tr>
+  <tr><td>GCP project</td><td>The blast-radius boundary for the whole platform.</td></tr>
+  <tr><td>GKE</td><td>Managed Kubernetes — runs the app, Argo CD, ESO, cloudflared.</td></tr>
+  <tr><td>Artifact Registry</td><td>Private container registry; pull via node SA, push via WIF.</td></tr>
+  <tr><td>WIF</td><td>OIDC → GCP token exchange so CI has no stored key.</td></tr>
+  <tr><td>Argo CD</td><td>Continuously syncs the cluster to the Helm chart in <code>ProdXCD</code>.</td></tr>
+  <tr><td>Helm</td><td>Parameterized YAML templates Argo CD renders.</td></tr>
+  <tr><td>Cloudflare Tunnel</td><td>Outbound-only HTTPS ingress; no public IP on the cluster.</td></tr>
+  <tr><td>Vault</td><td>Source of truth for every runtime password / token.</td></tr>
+  <tr><td>ESO</td><td>Materializes Vault secrets as K8s Secrets at runtime.</td></tr>
+  <tr><td>Trivy</td><td>Image CVE scan; blocks merge on fixable CRITICAL.</td></tr>
+</table>
+
+<div class="note info">
+  <span class="lbl">Where to go from here</span>
+  Open <a href="index.html">the setup guide</a> to actually build this from
+  scratch. Open the README in each of the three repositories for the
+  technical-deep-dive view of that component.
+</div>
+
+</main>
+</div>
+
+<footer>
+  ProdX — Architecture &amp; Components · Companion to the
+  <a href="index.html">step-by-step setup guide</a>.
+</footer>
+
+</body>
+</html>

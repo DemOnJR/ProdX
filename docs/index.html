@@ -157,7 +157,7 @@
 <div class="hero">
   <h1>ProdX — Complete Setup Guide</h1>
   <p>Everything you need to take this project from <b>zero</b> to a <b>live website</b> — written so anyone can follow it, even with no DevOps background.</p>
-  <p style="font-size:.9rem;opacity:.85;">Plan ~1 hour the first time. Most of that is waiting for the cloud cluster to build.</p>
+  <p style="font-size:.9rem;opacity:.85;">Plan ~1 hour the first time. Most of that is waiting for the cloud cluster to build. &nbsp;·&nbsp; Curious what each piece <em>is</em>? See the <a href="architecture.html" style="color:#fff;text-decoration:underline;">Architecture &amp; Components</a> page.</p>
 </div>
 
 <div class="note info">
@@ -585,6 +585,12 @@ The CI pipeline does this automatically. Trigger it by making any small change o
 git commit --allow-empty -m "ci: trigger first build"
 git push origin main</pre>
 </div>
+<p>Or, if you'd rather not touch <code>main</code>, fire both pipelines manually
+from the Actions tab — or with the <code>gh</code> CLI:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>gh workflow run ci-all.yml --ref main --repo YOUR-GITHUB-USERNAME/ProdX</pre>
+</div>
 <p>Watch it run in your ProdX repo on GitHub → <b>Actions</b> tab. When it finishes, it has
 built the website and API images and shipped them to the cluster. Argo CD then deploys them.</p>
 
@@ -714,17 +720,19 @@ to the fresh cluster.</p>
 <!-- ============================================================= -->
 <h2 id="destroy">12 · Destroy everything</h2>
 
-<p>To remove <b>everything</b> — cluster, project, all of it — destroy the environments in the
-<b>reverse</b> order you built them.</p>
+<p>To remove <b>everything</b> — cluster, project, all of it — destroy the
+environments in the order below. Note this is <b>not</b> a simple reverse of
+the build order: <code>vault-bootstrap</code> goes first because its
+<code>kubernetes_*</code> resources need the cluster to still exist.</p>
 
 <div class="code">
 <button class="copy">Copy</button>
-<pre><span class="c"># 1. The cluster and everything on it  (~6 min)</span>
-cd ProdXTF/envs/dev
+<pre><span class="c"># 1. The Vault wiring + secrets (needs the cluster still up)</span>
+cd ProdXTF/envs/vault-bootstrap
 terraform destroy
 
-<span class="c"># 2. The Vault wiring</span>
-cd ../vault-bootstrap
+<span class="c"># 2. The cluster and everything on it  (~6 min)</span>
+cd ../dev
 terraform destroy
 
 <span class="c"># 3. The GitHub branch-protection rules</span>
@@ -740,6 +748,23 @@ cd ../tfc-bootstrap
 terraform destroy</pre>
 </div>
 <p>Type <code>yes</code> at each prompt.</p>
+
+<div class="note warn">
+  <span class="lbl">If the dev destroy stalls on the Cloudflare tunnel</span>
+  Right after the cluster goes away, Cloudflare can still see the tunnel as
+  "active" for a few minutes (its edge hasn't noticed the cloudflared pods
+  are gone). Wait ~3 minutes and re-run <code>terraform destroy</code>. If
+  Terraform also reports <code>"Failed to construct REST client"</code> for
+  orphan <code>kubernetes_manifest</code> resources, target the cloudflare
+  resources directly:
+  <div class="code" style="margin-top:.5rem;">
+  <button class="copy">Copy</button>
+  <pre>terraform destroy \
+  -target=module.cloudflare.cloudflare_zero_trust_tunnel_cloudflared.this \
+  -target=module.cloudflare.random_id.tunnel_secret \
+  -auto-approve</pre>
+  </div>
+</div>
 
 <div class="note danger">
   <span class="lbl">The 30-day rule — important</span>
