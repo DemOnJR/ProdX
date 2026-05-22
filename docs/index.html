@@ -3,1960 +3,832 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ProdX — DevOps Capstone Tutorial</title>
+<title>ProdX — Complete Setup Guide</title>
 <style>
-:root {
-  --bg: #0b1020;
-  --panel: #111a33;
-  --panel-2: #0e1530;
-  --border: #22304f;
-  --border-strong: #2e3e63;
-  --text: #e6ecff;
-  --muted: #9aa7c7;
-  --faint: #6c789a;
-  --accent: #7c3aed;
-  --accent-2: #06b6d4;
-  --ok: #10b981;
-  --warn: #f59e0b;
-  --bad: #ef4444;
-  --code-bg: #06091a;
-  --code-border: #1a2548;
-  --link: #8ab4ff;
-}
-
-* { box-sizing: border-box; }
-
-html, body {
-  margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
-a { color: var(--link); text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-header.hero {
-  padding: 56px 24px 40px;
-  background: linear-gradient(180deg, #131c3a 0%, var(--bg) 100%);
-  border-bottom: 1px solid var(--border);
-  text-align: center;
-}
-header.hero .eyebrow {
-  display: inline-block;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: var(--accent-2);
-  background: rgba(6, 182, 212, 0.08);
-  border: 1px solid rgba(6, 182, 212, 0.25);
-  border-radius: 999px;
-  padding: 4px 14px;
-  margin-bottom: 16px;
-}
-header.hero h1 {
-  margin: 0 0 8px;
-  font-size: 56px;
-  letter-spacing: -0.5px;
-  background: linear-gradient(90deg, #c4b5fd, #67e8f9);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-header.hero .tagline { margin: 0 auto; color: var(--muted); font-size: 18px; max-width: 720px; }
-header.hero .author {
-  margin-top: 18px;
-  font-size: 13px;
-  color: var(--faint);
-  display: inline-flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-header.hero .author strong { color: var(--text); }
-header.hero .meta {
-  margin-top: 14px;
-  font-size: 13px;
-  color: var(--faint);
-  display: inline-flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.live-demo {
-  max-width: 900px;
-  margin: 32px auto 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-.live-demo a {
-  display: block;
-  padding: 16px 18px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  text-align: left;
-  text-decoration: none;
-  transition: transform .15s, border-color .15s;
-}
-.live-demo a:hover {
-  text-decoration: none;
-  border-color: var(--accent-2);
-  transform: translateY(-2px);
-}
-.live-demo .lbl {
-  display: block;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--faint);
-  margin-bottom: 4px;
-}
-.live-demo .url {
-  display: block;
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: 14px;
-  color: var(--text);
-  font-weight: 600;
-}
-.live-demo .desc {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 4px;
-}
-
-.layout {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  max-width: 1280px;
-  margin: 0 auto;
-  gap: 32px;
-  padding: 32px 24px 80px;
-}
-
-aside.toc {
-  position: sticky;
-  top: 24px;
-  align-self: start;
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
-  font-size: 13.5px;
-  border-right: 1px solid var(--border);
-  padding-right: 16px;
-}
-aside.toc h2 {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: var(--faint);
-  margin: 0 0 12px;
-}
-aside.toc ol {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-aside.toc li { margin: 4px 0; }
-aside.toc a {
-  display: block;
-  padding: 6px 10px;
-  border-radius: 6px;
-  color: var(--muted);
-  border-left: 2px solid transparent;
-}
-aside.toc a:hover { color: var(--text); background: var(--panel-2); text-decoration: none; }
-aside.toc a.active {
-  color: var(--text);
-  background: var(--panel-2);
-  border-left-color: var(--accent);
-}
-
-main { min-width: 0; }
-
-section { margin: 0 0 56px; scroll-margin-top: 24px; }
-section h2 {
-  font-size: 28px;
-  margin: 0 0 8px;
-  letter-spacing: -0.3px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 12px;
-}
-section h2 .step {
-  display: inline-block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent-2);
-  background: rgba(6, 182, 212, 0.08);
-  border: 1px solid rgba(6, 182, 212, 0.25);
-  border-radius: 999px;
-  padding: 2px 10px;
-  vertical-align: middle;
-  margin-right: 10px;
-}
-section h3 {
-  font-size: 18px;
-  margin: 28px 0 8px;
-  color: #c8d3ff;
-}
-section h4 {
-  font-size: 15px;
-  margin: 20px 0 6px;
-  color: #b6c0e0;
-}
-section p { margin: 10px 0; }
-section ul, section ol { padding-left: 22px; }
-section li { margin: 4px 0; }
-
-code {
-  font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
-  font-size: 13px;
-  background: var(--code-bg);
-  border: 1px solid var(--code-border);
-  border-radius: 4px;
-  padding: 1px 6px;
-  color: #d2dcff;
-}
-
-pre {
-  position: relative;
-  background: var(--code-bg);
-  border: 1px solid var(--code-border);
-  border-radius: 10px;
-  padding: 14px 16px;
-  overflow-x: auto;
-  margin: 12px 0;
-  font-size: 13px;
-}
-pre code {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  color: #d2dcff;
-  white-space: pre;
-}
-.copy-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: var(--panel);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity .15s;
-  font-family: inherit;
-}
-pre:hover .copy-btn { opacity: 1; }
-.copy-btn:hover { background: var(--panel-2); color: var(--text); }
-.copy-btn.copied { background: var(--ok); color: #062018; border-color: var(--ok); }
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 14px 0;
-  font-size: 14px;
-}
-th, td {
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-  padding: 10px 12px;
-}
-th { background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-tr:hover td { background: rgba(124, 58, 237, 0.04); }
-
-.callout {
-  margin: 14px 0;
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--accent);
-  color: var(--muted);
-  font-size: 14px;
-}
-.callout strong { color: var(--text); }
-.callout.note { border-left-color: var(--accent-2); }
-.callout.warn { border-left-color: var(--warn); }
-.callout.danger { border-left-color: var(--bad); }
-.callout.ok { border-left-color: var(--ok); }
-.callout p:first-child { margin-top: 0; }
-.callout p:last-child { margin-bottom: 0; }
-
-.diagram {
-  background: var(--code-bg);
-  border: 1px solid var(--code-border);
-  border-radius: 10px;
-  padding: 18px;
-  margin: 16px 0;
-  overflow-x: auto;
-}
-.diagram pre {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  color: #b6c0e0;
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-.diagram .legend {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--faint);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-}
-
-.kbd {
-  display: inline-block;
-  padding: 1px 6px;
-  border: 1px solid var(--border-strong);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  background: var(--panel);
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-  color: var(--text);
-}
-
-.repo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin: 16px 0;
-}
-.repo-card {
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 16px;
-}
-.repo-card h4 { margin: 0 0 6px; color: var(--text); font-size: 15px; }
-.repo-card p { margin: 0; font-size: 13px; color: var(--muted); }
-.repo-card .tag {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 11px;
-  letter-spacing: 0.5px;
-  background: rgba(124, 58, 237, 0.15);
-  color: #c4b5fd;
-  border: 1px solid rgba(124, 58, 237, 0.3);
-  padding: 1px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
-}
-
-footer {
-  border-top: 1px solid var(--border);
-  padding: 24px;
-  text-align: center;
-  color: var(--faint);
-  font-size: 13px;
-}
-
-@media (max-width: 880px) {
-  .layout { grid-template-columns: 1fr; }
-  aside.toc {
-    position: static;
-    max-height: none;
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-    padding-right: 0;
-    padding-bottom: 16px;
-    margin-bottom: 16px;
+  :root{
+    --bg:#f6f7fb; --card:#ffffff; --ink:#1d2433; --muted:#5b6577; --faint:#8b94a7;
+    --line:#e4e7ef; --brand:#4f46e5; --brand-soft:#eef0fe;
+    --code-bg:#1e2230; --code-ink:#e8ebf2;
+    --info:#2563eb; --info-bg:#eef4ff;
+    --tip:#0f9d6e; --tip-bg:#e9f8f1;
+    --warn:#b7791f; --warn-bg:#fdf6e7;
+    --danger:#dc2626; --danger-bg:#fdecec;
   }
-}
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--brand);}
+  code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    background:var(--brand-soft); color:#3730a3;
+    padding:.1em .38em; border-radius:5px; font-size:.9em;
+  }
+  h1,h2,h3{line-height:1.25; scroll-margin-top:80px;}
+  h2{font-size:1.5rem; margin:2.4rem 0 .4rem; padding-top:.6rem; border-top:2px solid var(--line);}
+  h3{font-size:1.13rem; margin:1.6rem 0 .3rem;}
+
+  /* top bar */
+  header.top{
+    position:sticky; top:0; z-index:30;
+    background:#fff; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:.6rem; padding:.7rem 1.1rem;
+  }
+  header.top .logo{
+    width:30px;height:30px;border-radius:8px;flex:none;
+    background:linear-gradient(135deg,var(--brand),#06b6d4);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.95rem;
+  }
+  header.top b{font-size:1rem;}
+  header.top span{color:var(--faint); font-size:.85rem;}
+
+  .layout{display:flex; gap:0; max-width:1180px; margin:0 auto;}
+  nav.toc{
+    width:270px; flex:none; padding:1.4rem .8rem 3rem;
+    position:sticky; top:49px; height:calc(100vh - 49px); overflow-y:auto;
+  }
+  nav.toc .grp{font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--faint); margin:1.1rem .6rem .25rem;}
+  nav.toc a{
+    display:block; color:var(--muted); text-decoration:none;
+    padding:.32rem .6rem; border-radius:7px; font-size:.9rem;
+  }
+  nav.toc a:hover{background:var(--brand-soft); color:var(--brand);}
+  main{flex:1; min-width:0; padding:1.4rem 1.6rem 6rem; background:var(--bg);}
+
+  .hero{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed 55%,#06b6d4);
+    color:#fff; border-radius:16px; padding:1.7rem 1.8rem; margin-bottom:.5rem;
+  }
+  .hero h1{margin:.1rem 0 .5rem; font-size:1.95rem;}
+  .hero p{margin:.2rem 0; opacity:.95;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:1.05rem 1.2rem; margin:1rem 0;}
+
+  /* code blocks */
+  .code{position:relative; margin:.7rem 0;}
+  .code pre{
+    background:var(--code-bg); color:var(--code-ink);
+    padding:.9rem 1rem; border-radius:10px; overflow-x:auto;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.85rem; line-height:1.55; margin:0;
+  }
+  .code pre .c{color:#8b93a7;}      /* comment */
+  .code button.copy{
+    position:absolute; top:.5rem; right:.5rem;
+    background:#3a3f52; color:#cdd2e0; border:0; border-radius:6px;
+    padding:.25rem .55rem; font-size:.72rem; cursor:pointer;
+  }
+  .code button.copy:hover{background:#4a5066;}
+
+  /* callouts */
+  .note{border-radius:10px; padding:.75rem 1rem; margin:.85rem 0;
+    border:1px solid; font-size:.94rem;}
+  .note .lbl{font-weight:700; display:block; margin-bottom:.1rem;}
+  .note.info{background:var(--info-bg); border-color:#cfe0ff;}
+  .note.info .lbl{color:var(--info);}
+  .note.tip{background:var(--tip-bg); border-color:#bce9d5;}
+  .note.tip .lbl{color:var(--tip);}
+  .note.warn{background:var(--warn-bg); border-color:#f0e0b6;}
+  .note.warn .lbl{color:var(--warn);}
+  .note.danger{background:var(--danger-bg); border-color:#f5c6c6;}
+  .note.danger .lbl{color:var(--danger);}
+
+  table{border-collapse:collapse; width:100%; margin:.8rem 0; font-size:.9rem;}
+  th,td{border:1px solid var(--line); padding:.5rem .65rem; text-align:left; vertical-align:top;}
+  th{background:#f0f2f8; font-weight:700;}
+
+  .step{display:flex; gap:.7rem; align-items:baseline;}
+  .step .n{
+    flex:none; width:26px; height:26px; border-radius:50%;
+    background:var(--brand); color:#fff; font-weight:700; font-size:.85rem;
+    display:flex; align-items:center; justify-content:center; transform:translateY(4px);
+  }
+  ul.clean{padding-left:1.2rem;}
+  ul.clean li{margin:.25rem 0;}
+  .pill{display:inline-block; background:var(--brand-soft); color:var(--brand);
+    border-radius:20px; padding:.05rem .6rem; font-size:.78rem; font-weight:700;}
+  footer{max-width:1180px; margin:0 auto; padding:1.5rem 1.6rem 3rem;
+    color:var(--faint); font-size:.85rem; border-top:1px solid var(--line);}
+  .kbd{background:#fff;border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:5px;padding:.05em .4em;font-size:.85em;font-family:inherit;}
+
+  @media(max-width:880px){
+    nav.toc{display:none;}
+    main{padding:1.1rem 1rem 5rem;}
+  }
 </style>
 </head>
 <body>
 
-<header class="hero">
-  <span class="eyebrow">ITSchool DevOps · Final Project Presentation</span>
-  <h1>ProdX</h1>
-  <p class="tagline">A small full-stack app shipped through a complete DevOps pipeline: GitHub → CI (Workload Identity Federation, no static secrets) → Google Artifact Registry → Terraform-provisioned GKE → Argo CD → Cloudflare Tunnel → live URL — all reproducible by anyone with their own GCP and Cloudflare accounts.</p>
-
-  <div class="author">
-    <span>Presented by <strong>Pipiasi Bogdan</strong></span>
-    <span>·</span>
-    <span>ITSchool DevOps Course · 2026</span>
-  </div>
-
-  <div class="meta">
-    <span>FastAPI · React + React Flow · PostgreSQL · Redis</span>
-    <span>GKE · Argo CD · Cloudflare Tunnel</span>
-    <span>Terraform · HCP Terraform · GitHub Actions · Google Artifact Registry · Workload Identity Federation</span>
-  </div>
-
-  <div class="live-demo">
-    <a href="https://prodx.pbcv.dev" target="_blank" rel="noopener">
-      <span class="lbl">App</span>
-      <span class="url">prodx.pbcv.dev</span>
-      <span class="desc">React Flow canvas rendered from Postgres</span>
-    </a>
-    <a href="https://prodxapi.pbcv.dev/api/metrics" target="_blank" rel="noopener">
-      <span class="lbl">API</span>
-      <span class="url">prodxapi.pbcv.dev</span>
-      <span class="desc">FastAPI: /health, /api/metrics, /api/graphs</span>
-    </a>
-    <a href="https://argocd.pbcv.dev" target="_blank" rel="noopener">
-      <span class="lbl">Argo CD</span>
-      <span class="url">argocd.pbcv.dev</span>
-      <span class="desc">GitOps reconciler UI (admin login)</span>
-    </a>
-  </div>
+<header class="top">
+  <div class="logo">PX</div>
+  <b>ProdX</b>
+  <span>Complete Setup Guide</span>
 </header>
 
 <div class="layout">
-  <aside class="toc">
-    <h2>Contents</h2>
-    <nav>
-      <ol>
-        <li><a href="#overview">1. Project summary</a></li>
-        <li><a href="#architecture">2. Architecture</a></li>
-        <li><a href="#prereqs">3. Prerequisites</a></li>
-        <li><a href="#clone">4. The three repos</a></li>
-        <li><a href="#local">5. Local stack (Docker Compose)</a></li>
-        <li><a href="#ci">6. CI: GitHub Actions → Artifact Registry (via WIF)</a></li>
-        <li><a href="#identity">7. GCP setup</a></li>
-        <li><a href="#hcp">8. HCP Terraform</a></li>
-        <li><a href="#cloudflare">9. Cloudflare tunnel</a></li>
-        <li><a href="#bootstrap">10. Bootstrap apply (project)</a></li>
-        <li><a href="#apply">11. Dev apply (cluster)</a></li>
-        <li><a href="#verify">12. Verification</a></li>
-        <li><a href="#prodxcd">13. ProdXCD + root Argo Application</a></li>
-        <li><a href="#teardown">14. Teardown</a></li>
-        <li><a href="#commands">15. Reproducing this (your own accounts)</a></li>
-        <li><a href="#troubleshooting">16. Troubleshooting</a></li>
-      </ol>
-    </nav>
-  </aside>
+<nav class="toc">
+  <div class="grp">Get ready</div>
+  <a href="#what">1 · What is ProdX?</a>
+  <a href="#accounts">2 · Accounts you need</a>
+  <a href="#tools">3 · Install the tools</a>
+  <a href="#fork">4 · Fork the 3 repos</a>
+  <a href="#login">5 · Log in to everything</a>
+  <a href="#keys">6 · Collect your keys</a>
+  <a href="#orgname">7 · One config edit</a>
+  <div class="grp">Build it</div>
+  <a href="#build">8 · Run the environments</a>
+  <a href="#verify">9 · Check it works</a>
+  <a href="#argocd">10 · Open Argo CD</a>
+  <div class="grp">Live with it</div>
+  <a href="#pause">11 · Pause &amp; resume</a>
+  <a href="#destroy">12 · Destroy everything</a>
+  <a href="#trouble">13 · Troubleshooting</a>
+  <a href="#glossary">14 · Glossary</a>
+</nav>
 
 <main>
 
-<section id="overview">
-  <h2><span class="step">01</span>Project summary</h2>
-
-  <div class="callout note">
-    <p><strong>About this document.</strong> This is the presentation for the project, not a personal tutorial. The live URLs in the header are the deployed instance using my domain (<code>pbcv.dev</code>), GCP project (<code>prodx-dev2</code>), Artifact Registry (<code>europe-west3-docker.pkg.dev/prodx-dev2/prodx</code>), and GitHub user (<code>DemOnJR</code>) — concrete values shown as a worked example. Anyone reproducing the project substitutes their own equivalents (see <a href="#commands">section 15</a>). The Git repositories, Terraform code, Helm chart, CI workflow, and tutorial HTML are public and self-contained.</p>
-  </div>
-
-  <h3>What's in the repos (public) vs what stays local (secret)</h3>
-
-  <p>All three repos are public so the project can be forked, reviewed, and reproduced. The split between what's safely committed and what stays on your machine is deliberate:</p>
-
-  <table>
-    <thead><tr><th>What</th><th>Where it lives</th><th>Why</th></tr></thead>
-    <tbody>
-      <tr>
-        <td>Terraform <code>.tf</code> code (modules, envs)</td>
-        <td>✅ in <code>ProdXTF</code> repo</td>
-        <td>It's just configuration; no secrets, fully forkable</td>
-      </tr>
-      <tr>
-        <td><code>terraform.tfvars.example</code></td>
-        <td>✅ in repo (placeholders only)</td>
-        <td>Shows what variables exist; never contains real values</td>
-      </tr>
-      <tr>
-        <td><code>terraform.tfvars</code> (real values: billing account, tunnel token, project id)</td>
-        <td>❌ gitignored — local to your machine</td>
-        <td><code>*.tfvars</code> + <code>!*.tfvars.example</code> in <code>.gitignore</code></td>
-      </tr>
-      <tr>
-        <td>Helm chart templates + <code>values.yaml</code></td>
-        <td>✅ in <code>ProdXCD</code> repo</td>
-        <td>Image names, replica counts, resource limits are configuration</td>
-      </tr>
-      <tr>
-        <td>Postgres password</td>
-        <td>⚠️ plaintext in <code>ProdXCD/charts/prodx/values.yaml</code></td>
-        <td>Dev-only; Postgres only listens on the cluster network. For production, swap the in-chart Secret for one managed out of band, SOPS-encrypted in Git, or pulled from a managed secret store (e.g. GCP Secret Manager) via External Secrets Operator.</td>
-      </tr>
-      <tr>
-        <td>Registry credentials (for CI image push)</td>
-        <td>✅ none stored — Workload Identity Federation</td>
-        <td>CI's GitHub Actions OIDC token is exchanged for a short-lived (~1h) GCP access token. ProdXTF provisions the trust binding; no long-lived PAT or service-account key exists in GitHub.</td>
-      </tr>
-      <tr>
-        <td>Cloudflare tunnel JWT</td>
-        <td>❌ local <code>terraform.tfvars</code> only</td>
-        <td>If it leaks: delete the tunnel in Cloudflare Zero Trust → the JWT dies with it; create a new tunnel + new token</td>
-      </tr>
-      <tr>
-        <td>GCP service account keys</td>
-        <td>❌ none exist by default</td>
-        <td>Local execution uses your <code>gcloud</code> ADC; remote execution would use a key uploaded to HCP Terraform as a sensitive workspace variable (or Workload Identity Federation — no static key)</td>
-      </tr>
-      <tr>
-        <td>Argo CD bootstrap admin password</td>
-        <td>❌ generated by Argo at install</td>
-        <td>Auto-created Secret <code>argocd-initial-admin-secret</code>; rotate via Argo UI on first login, then <code>kubectl delete</code> the bootstrap secret</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div class="callout ok">
-    <p><strong>For the evaluator forking these repos:</strong> after <code>git clone</code>, the only files you create yourself are <code>terraform.tfvars</code> in each <code>envs/</code> directory (copy from the <code>.example</code> files). <strong>Zero GitHub Actions secrets needed</strong> — CI authenticates to GCP via OIDC + Workload Identity Federation, configured automatically by ProdXTF. Everything else is already in the repos.</p>
-  </div>
-
-  <p>
-    ProdX is a small full-stack web app (FastAPI backend, React frontend) wrapped in a complete DevOps pipeline.
-    The point isn't the app itself — it's the path the app takes from a developer's machine to a publicly-reachable URL:
-    <strong>source → CI build → container registry → Terraform-provisioned GKE cluster → GitOps reconciler → Cloudflare Tunnel → live</strong>.
-    Every layer is infrastructure-as-code where possible; the few manual steps that exist (claiming a GCP free trial, clicking through Cloudflare Tunnel setup) are documented and bounded.
-  </p>
-
-  <p>The work is split across three GitHub repositories so the boundaries between
-    <em>app code</em>, <em>infrastructure</em>, and <em>cluster state</em> stay clean:</p>
-
-  <div class="repo-grid">
-    <div class="repo-card">
-      <h4>ProdX</h4>
-      <p>FastAPI backend, React + React Flow frontend, Postgres, Redis. Local <code>docker compose</code> stack and the two per-service GitHub Actions workflows that build + publish images to Google Artifact Registry (auth via WIF) and trigger a kubectl rollout.</p>
-      <span class="tag">App</span>
-    </div>
-    <div class="repo-card">
-      <h4>ProdXTF</h4>
-      <p>Terraform for the cluster: VPC + GKE + Argo CD + Cloudflare Tunnel. State lives in HCP Terraform; execution runs locally against your <code>gcloud</code> credentials.</p>
-      <span class="tag">Infrastructure</span>
-    </div>
-    <div class="repo-card">
-      <h4>ProdXCD</h4>
-      <p>Argo CD <code>Application</code> manifests + Kustomize/Helm for ProdX. Argo CD watches this repo and reconciles the cluster — CI never <code>kubectl apply</code>s anything.</p>
-      <span class="tag">GitOps</span>
-    </div>
-  </div>
-
-  <h3>Tech stack</h3>
-  <table>
-    <thead><tr><th>Layer</th><th>What</th><th>Why</th></tr></thead>
-    <tbody>
-      <tr><td>Backend</td><td>FastAPI on Python 3.12, SQLAlchemy 2, Redis</td><td>Type-checked, small, batteries-included.</td></tr>
-      <tr><td>Frontend</td><td>React 18 + Vite + <code>@xyflow/react</code></td><td>React Flow renders the project's own architecture as an interactive graph.</td></tr>
-      <tr><td>Datastore</td><td>PostgreSQL 16 (JSONB), Redis 7</td><td>Graph payload in JSONB; Redis is a read-through cache.</td></tr>
-      <tr><td>Local dev</td><td>Docker Compose</td><td>One command to run everything.</td></tr>
-      <tr><td>CI</td><td>GitHub Actions → Google Artifact Registry (via WIF)</td><td>Two per-service workflows: lint/test/audit on every PR, build/scan/push on every main commit. No long-lived registry credentials in GitHub.</td></tr>
-      <tr><td>Cluster</td><td>GKE Standard zonal, <code>e2-small</code> spot nodes, autoscaler 1→3</td><td>Cheap enough to fit inside GCP's $300 free trial credit.</td></tr>
-      <tr><td>IaC</td><td>Terraform 1.9+ with HCP Terraform backend</td><td>Modules + envs split; state out of the repo.</td></tr>
-      <tr><td>GitOps</td><td>Argo CD via Helm</td><td>Cluster pulls from Git; CI never pushes to the cluster.</td></tr>
-      <tr><td>Public entry</td><td>Cloudflare Tunnel + <code>cloudflared</code> Deployment</td><td>No LoadBalancer, no cert-manager — TLS terminates at CF edge.</td></tr>
-    </tbody>
-  </table>
-</section>
-
-<section id="architecture">
-  <h2><span class="step">02</span>Architecture</h2>
-
-  <h3>Runtime — what happens when a user opens <code>prodx.pbcv.dev</code></h3>
-  <div class="diagram">
-<pre>                                Browser
-                                   │  HTTPS request to prodx.pbcv.dev
-                                   ▼
-                       ┌──────────────────────────┐
-                       │  Cloudflare edge (TLS)   │  cert managed by CF; no
-                       └──────────────┬───────────┘  cert-manager needed
-                                      │
-                              QUIC tunnel  (outbound from cluster — zero
-                                      │   inbound ports, no LoadBalancer)
-                                      ▼
-                       ┌──────────────────────────┐
-                       │ cloudflared Deployment   │  routes per the Public
-                       │ (2 pods, 4 CF connections│  Hostnames you set in
-                       │  per pod to FRA edges)   │  the CF Zero Trust UI
-                       └──┬───────────┬────────┬──┘
-                          │           │        │   argocd.pbcv.dev →
-                          │           │        └──▶ argocd-server (kubectl
-                          │           │              port-forward equivalent
-                          │           │              but via tunnel)
-                          │           │
-                          │           │  prodxapi.pbcv.dev → prodx-api :8000
-                          │           ▼
-                          │     ┌───────────┐
-                          │     │ prodx-api │  FastAPI; envs/dev/main.tf
-                          │     │ Deployment│  injects DATABASE_URL +
-                          │     └─┬───────┬─┘  REDIS_URL + CORS_ORIGINS
-                          │       │       │
-                          │       ▼       ▼
-                          │  ┌────────┐ ┌──────┐
-                          │  │postgres│ │redis │  StatefulSet + PVC
-                          │  │  PVC   │ │ PVC  │  (standard-rwo PD)
-                          │  └────────┘ └──────┘
-                          │
-                          │  prodx.pbcv.dev → prodx-web :80
-                          ▼
-                    ┌──────────┐
-                    │ prodx-web│  nginx + React SPA. nginx config
-                    │Deployment│  proxies /api/* to prodx-api :8000
-                    └──────────┘  inside the cluster, so the SPA
-                                  uses relative URLs and the image
-                                  is environment-agnostic.
-
-                ── GKE Standard zonal cluster (europe-west3-a) ──</pre>
-    <div class="legend">
-      <span>↓ TLS terminates at Cloudflare. Cluster has no public IP.</span>
-      <span>· cloudflared opens 4 QUIC connections per pod for redundancy</span>
-    </div>
-  </div>
-
-  <h3>GitOps flow — what happens when you push code</h3>
-  <div class="diagram">
-<pre>  Developer push to DemOnJR/ProdX (app code)
-              │
-              ▼
-       GitHub Actions (ci-backend.yml / ci-frontend.yml)
-   build europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-api:latest
-   build europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-web:latest
-              │       ──push──▶  Google Artifact Registry
-              │                  (private; GKE node SA has reader)
-              │
-              │  Auth = Workload Identity Federation. CI presents its
-              │  GitHub OIDC token to GCP; GCP returns a short-lived
-              │  (~1h) access token tied to the gha-prodx-publisher SA.
-              │  No long-lived secret in GitHub.
-              │
-              ▼
-   kubectl -n prodx rollout restart deployment/prodx-{api,web}
-              │      (same WIF token, container.developer role on the cluster)
-              ▼
-       new image pulled (imagePullPolicy: Always)  ──▶  new code live
-
-  ───────────────────────────────────────────────────────────────
-
-  Manifest changes go the other way:
-
-  Developer push to DemOnJR/ProdXCD (helm chart)
-              │
-              ▼     Argo CD polls main every ~3 min
-              │     (or click "Sync" in the Argo CD UI for instant pickup)
-              ▼
-       Argo CD detects diff → applies into prodx namespace
-              │
-              ▼
-       Deployment/StatefulSet/Service reconcile
-              │
-              ▼
-       Pods restart; new spec live</pre>
-    <div class="legend">
-      <span>CI authenticates via WIF — no static credentials in GitHub. Same identity pushes to GAR and rolls the deployment.</span>
-    </div>
-  </div>
-</section>
-
-<section id="prereqs">
-  <h2><span class="step">03</span>Prerequisites</h2>
-
-  <h3>Tools to install</h3>
-
-  <div class="callout note">
-    <p>All commands in this document assume <strong>Ubuntu 22.04 / 24.04</strong> (server or desktop, native or WSL2). See <a href="#commands">section 15.1</a> for the single copy-paste block that installs everything below.</p>
-  </div>
-
-  <table>
-    <thead><tr><th>Tool</th><th>Why</th><th>Install (Ubuntu)</th></tr></thead>
-    <tbody>
-      <tr><td>Git, curl, jq</td><td>Clone + push, JSON munging</td><td><code>sudo apt install -y git curl jq</code></td></tr>
-      <tr><td>Docker Engine</td><td>Run the local stack, build images</td><td><code>curl -fsSL https://get.docker.com | sudo sh</code></td></tr>
-      <tr><td>gcloud CLI</td><td>Authenticate Terraform to GCP, kubeconfig</td><td>Google Cloud apt repo — see 15.1</td></tr>
-      <tr><td>Terraform</td><td>Provision GCP, K8s manifests</td><td>HashiCorp apt repo — see 15.1</td></tr>
-      <tr><td>kubectl</td><td>Talk to the cluster</td><td>Kubernetes pkgs.k8s.io apt repo — see 15.1</td></tr>
-    </tbody>
-  </table>
-
-  <h3>Accounts you'll need</h3>
-  <ul>
-    <li><strong>GitHub</strong> — to host the three repos. CI's image push uses GitHub Actions OIDC, federated to GCP — no separate registry account needed.</li>
-    <li><strong>Google Cloud</strong> — free trial gives you $300 / 90 days, plenty for the cluster. Artifact Registry (private container registry) is part of the project.</li>
-    <li><strong>HCP Terraform</strong> (free tier, formerly "Terraform Cloud") — for remote state.</li>
-    <li><strong>Cloudflare</strong> with a managed zone — the tutorial uses <code>pbcv.dev</code>; substitute your own.</li>
-  </ul>
-
-  <div class="callout warn">
-    <p><strong>Cost reality check.</strong> GKE charges ~$73/month for the control plane on both Standard and Autopilot. Add a single <code>e2-small</code> spot node (~$5) and you're at roughly $80/month. The $300 free trial credit covers the whole course term comfortably, but <strong>tear the cluster down when you're not actively working on it</strong> if you want the credit to stretch.</p>
-  </div>
-</section>
-
-<section id="clone">
-  <h2><span class="step">04</span>Clone the repos</h2>
-  <p>Pick a workspace folder. The tutorial assumes a single parent directory holds all three repos side-by-side.</p>
-<pre><code>mkdir prodx-workspace
-cd prodx-workspace
-git clone https://github.com/DemOnJR/ProdX.git
-git clone https://github.com/DemOnJR/ProdXTF.git
-git clone https://github.com/DemOnJR/ProdXCD.git</code></pre>
-  <p>If you're forking instead of using these repos directly, replace <code>DemOnJR</code> with your GitHub username everywhere in this tutorial.</p>
-</section>
-
-<section id="local">
-  <h2><span class="step">05</span>Run ProdX locally with Docker Compose</h2>
-  <p>Before touching any cloud, verify the app runs on your machine.</p>
-<pre><code>cd ProdX
-docker compose up --build</code></pre>
-  <p>First build takes 2–3 minutes (Node + Python image pulls + frontend npm install). On subsequent runs it's seconds. Once compose finishes:</p>
-  <ul>
-    <li>Frontend: <a href="http://localhost:8080">http://localhost:8080</a></li>
-    <li>API (direct): <a href="http://localhost:8000/health">http://localhost:8000/health</a>, <a href="http://localhost:8000/api/metrics">http://localhost:8000/api/metrics</a></li>
-    <li>API <em>via the nginx proxy in the web container</em>: <a href="http://localhost:8080/api/metrics">http://localhost:8080/api/metrics</a></li>
-  </ul>
-
-  <p>The React Flow canvas loads the <code>prodx</code> graph seeded by the API on boot — a small diagram of Browser → Nginx → FastAPI → Postgres / Redis. The right-hand panel polls <code>/api/metrics</code> every 5s and shows status dots for each dependency.</p>
-
-  <div class="callout note">
-    <p><strong>Same image, every environment.</strong> The published <code>prodx-web</code> image doesn't bake any API URL at build time. Its nginx config proxies <code>/api/*</code> to the upstream service name <code>prodx-api</code> — which resolves via Docker Compose service-name DNS in local compose, and via Kubernetes Service DNS in the cluster. That's why <code>http://localhost:8080/api/metrics</code> works here and <code>https://prodx.pbcv.dev/api/metrics</code> works in production, with the same exact image and zero env-var overrides.</p>
-  </div>
-
-  <div class="callout ok">
-    <p><strong>Data persistence.</strong> Postgres lives in a named volume (<code>pg_data</code>). <code>docker compose down</code> keeps the data; <code>docker compose down -v</code> wipes it.</p>
-  </div>
-</section>
-
-<section id="ci">
-  <h2><span class="step">06</span>CI: GitHub Actions → Artifact Registry (via WIF)</h2>
-
-  <h3>No registry secret to create — Workload Identity Federation handles auth</h3>
-
-  <p>Earlier iterations of this project pushed to Docker Hub via a <code>DOCKERHUB_TOKEN</code> stored as a GitHub Actions secret. That works, but it's a long-lived credential — a leaked token gives an attacker push access until you remember to rotate it. The current setup eliminates the secret entirely:</p>
-
-  <ol>
-    <li>ProdXTF's <code>modules/registry</code> provisions a private Artifact Registry repo, a dedicated GCP service account (<code>gha-prodx-publisher</code>), and a Workload Identity Pool + Provider that trusts <strong>only</strong> GitHub Actions OIDC tokens whose <code>repository</code> claim matches your repo.</li>
-    <li>At job time, <code>google-github-actions/auth@v3</code> presents the runner's GitHub OIDC token to GCP; GCP returns a ~1h access token tied to the publisher SA. CI uses that token for <code>docker push</code> + <code>kubectl rollout restart</code>.</li>
-    <li>Nothing long-lived ever lives in GitHub. A leaked GCP access token is auto-expired in 60 minutes; the trust binding can be revoked from Terraform in one resource removal.</li>
-  </ol>
-
-  <div class="callout ok">
-    <p><strong>If you fork this project</strong>: change <code>github_repo_owner</code> in <code>ProdXTF/envs/dev/terraform.tfvars</code> to your GitHub username and apply Terraform. The OIDC binding now trusts <em>your</em> repo. No GitHub Actions secret to create.</p>
-  </div>
-
-  <h3>Workflow structure — two per-service files, one job each</h3>
-
-  <p>CI is split into two workflows so backend and frontend evolve independently:</p>
-
-<pre><code>.github/workflows/
-├── ci-backend.yml      Single-job pipeline for the FastAPI service
-└── ci-frontend.yml     Single-job pipeline for the React + Vite service</code></pre>
-
-  <p>Each workflow:</p>
-  <ul>
-    <li><strong>Runs on PR to <code>main</code></strong>: full lint/test/audit/build/scan. No registry push, no cluster touch.</li>
-    <li><strong>Runs on push to <code>main</code></strong> (path-filtered to its own service): skips lint/test/audit (the PR already validated them), then build → Trivy scan → push to GAR → <code>kubectl rollout restart</code> → wait for rollout.</li>
-  </ul>
-
-  <p>The Actions tab shows two checks per PR (one per service), each named <code>🚀 Pipeline</code>. The workflow name disambiguates: <code>CI · Backend / 🚀 Pipeline</code> vs <code>CI · Frontend / 🚀 Pipeline</code>.</p>
-
-  <h3>What each step does</h3>
-
-  <table>
-    <thead>
-      <tr><th>Step</th><th>PR?</th><th>main push?</th><th>What</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>📥 Checkout</td><td>✅</td><td>✅</td><td><code>actions/checkout@v6</code></td></tr>
-      <tr><td>🐍 / 🟢 Set up Python 3.12 / Node 22</td><td>✅</td><td>—</td><td>main trusts the PR's validation; skips toolchain setup</td></tr>
-      <tr><td>📦 Install dev deps</td><td>✅</td><td>—</td><td>pip / npm ci with the runner's built-in cache</td></tr>
-      <tr><td>🔍 Lint / TypeScript</td><td>✅</td><td>—</td><td>ruff (backend) / <code>tsc --noEmit</code> (frontend)</td></tr>
-      <tr><td>🧪 Tests / Vite build</td><td>✅</td><td>—</td><td>pytest (backend) / <code>npm run build</code> (frontend)</td></tr>
-      <tr><td>🔐 Audit deps</td><td>✅</td><td>—</td><td>pip-audit / npm audit (CRITICAL threshold)</td></tr>
-      <tr><td>🐳 Set up Buildx</td><td>✅</td><td>✅</td><td>shared cache (<code>type=gha</code>) across PR and main runs</td></tr>
-      <tr><td>🏷️ Compute image tags + OCI labels</td><td>✅</td><td>✅</td><td><code>docker/metadata-action</code> — produces <code>:main</code>, <code>:latest</code>, <code>:sha-xxxxxxx</code> on main</td></tr>
-      <tr><td>🔨 Build image (load locally)</td><td>✅</td><td>✅</td><td>single buildx invocation; image lives in the runner's local docker daemon</td></tr>
-      <tr><td>🛡️ Trivy scan</td><td>✅</td><td>✅</td><td>fails on CRITICAL CVE with a known fix (<code>ignore-unfixed: true</code>)</td></tr>
-      <tr><td>🔑 Auth to GCP (WIF)</td><td>—</td><td>✅</td><td>OIDC token → 1h GCP access token. No long-lived secret.</td></tr>
-      <tr><td>🐳 Configure docker for GAR</td><td>—</td><td>✅</td><td><code>gcloud auth configure-docker europe-west3-docker.pkg.dev</code></td></tr>
-      <tr><td>🛠️ Install gke-gcloud-auth-plugin</td><td>—</td><td>✅</td><td>required for kubectl to talk to GKE since GKE 1.26</td></tr>
-      <tr><td>🚢 Tag + push to GAR</td><td>—</td><td>✅</td><td><code>docker tag</code> + <code>docker push</code> for each tag from metadata-action. No second build (image is the one already in local docker)</td></tr>
-      <tr><td>🔁 Roll deployment</td><td>—</td><td>✅</td><td><code>kubectl -n prodx rollout restart deployment/prodx-{api,web}</code> → wait 180s for Ready</td></tr>
-    </tbody>
-  </table>
-
-  <h4>Why single-job + step-level conditionals (not job-level matrix)</h4>
-
-  <p>An earlier iteration split each pipeline into a matrix of parallel quality jobs + a build job + a publish job (~7 jobs per service). That kept lint/test/audit running in parallel but duplicated the checkout/setup/install steps across jobs. The final shape collapses everything into one job, runs the quality steps sequentially, and gates publish steps with <code>if: github.event_name != 'pull_request'</code>. ~250 lines shorter, marginally slower on quality, one canvas box per service.</p>
-
-  <h4>Trivy: scanning for known CVEs before publishing</h4>
-  <p>The Trivy step runs <a href="https://github.com/aquasecurity/trivy"><code>trivy image</code></a> on the freshly-built image and fails the job if it finds a <strong>CRITICAL</strong> CVE with a known fix:</p>
-
-<pre><code>- uses: aquasecurity/trivy-action@v0.36.0
-  with:
-    image-ref: prodx-api:ci-scan
-    exit-code: '1'
-    severity: 'CRITICAL'
-    ignore-unfixed: true
-    vuln-type: 'os,library'</code></pre>
-
-  <ul>
-    <li><strong>CRITICAL only</strong> — the actionable signal. If it fires, you can almost always fix it by bumping a base image or a library.</li>
-    <li><strong><code>ignore-unfixed: true</code></strong> — drops CVEs that have no patch available yet. They'd otherwise keep the build red forever with nothing you can do about it, training you to ignore alerts.</li>
-  </ul>
-  <p>To tighten later: change <code>severity: CRITICAL</code> to <code>severity: HIGH,CRITICAL</code> in both workflows. To loosen for a known-tolerable issue: add a <code>.trivyignore</code> file with the CVE ID.</p>
-
-  <h3>Branching model — feature branches off main</h3>
-
-  <p>Single long-lived branch (<code>main</code>); every change goes through an ephemeral feature branch that dies after merge. Standard GitHub Flow.</p>
-
-  <table>
-    <thead><tr><th>Branch</th><th>Lifecycle</th><th>What CI does</th></tr></thead>
-    <tbody>
-      <tr><td><code>main</code></td><td>Permanent. Argo CD watches the matching Helm chart in <code>ProdXCD</code>; the in-cluster pods always reflect what's running.</td><td>Push to main → full pipeline → image to GAR → rollout restart → live ~3 min later</td></tr>
-      <tr><td><code>feat/*</code>, <code>fix/*</code>, <code>chore/*</code></td><td>Created off main, pushed for the PR, deleted automatically after the squash-merge.</td><td>Push triggers no CI (only PR triggers do); PR runs lint/test/audit/build/scan to gate the merge</td></tr>
-    </tbody>
-  </table>
-
-  <p>Promotion path:</p>
-<pre><code>git checkout main && git pull
-git checkout -b feat/whatever
-# edit, commit
-git push -u origin feat/whatever
-# Open PR feat/whatever → main; wait for CI green; squash-merge in UI
-git checkout main && git pull
-git branch -D feat/whatever      # local cleanup (remote already auto-deleted)</code></pre>
-
-  <p>An earlier iteration used a long-lived <code>dev</code> branch as a staging area, but squash-merge (the chosen merge style) reliably leaves <code>dev</code> drifted ("N ahead, 1 behind") after every PR because squash creates new SHAs on main that dev's originals don't share. Workarounds (manual <code>git reset --hard origin/main</code> after every merge, or an auto-sync workflow) all amount to "fight squash-merge". Dropping the long-lived branch entirely is the actually-permanent fix.</p>
-
-  <h4>Recommended branch protection on <code>main</code></h4>
-
-  <p>To enforce the PR-only flow (no direct pushes, no merging until CI is green), set branch protection in the repo's settings. One-time setup, ~30 seconds:</p>
-
-  <ol>
-    <li>Open <code>https://github.com/&lt;you&gt;/ProdX/settings/branches</code></li>
-    <li>Click <strong>Add branch ruleset</strong> (or <strong>Add classic branch protection rule</strong> for the legacy UI).</li>
-    <li>Branch name pattern: <code>main</code></li>
-    <li>Enable:
-      <ul>
-        <li><strong>Require a pull request before merging</strong> — direct pushes to main blocked; everything goes through PR.</li>
-        <li><strong>Require status checks to pass before merging</strong> — list both <code>🚀 Pipeline</code> checks (one from each workflow, GitHub disambiguates by the workflow name).</li>
-        <li><strong>Require branches to be up to date before merging</strong> — forces PR to be rebased on latest main before merge; surfaces conflicts before they land.</li>
-        <li><strong>Do not allow bypassing the above settings</strong> — applies the rules to admins too (i.e. you).</li>
-      </ul>
-    </li>
-    <li>Save.</li>
-  </ol>
-
-  <div class="callout note">
-    <p>After enabling: <code>git push origin main</code> from your laptop will be rejected with <em>"protected branch"</em>. The only path becomes: feature branch → PR → squash-merge.</p>
-    <p>For Dependabot PRs, the same gates apply automatically — they can't auto-merge until CI passes. Combined with the cooldown + security update bypass already configured, this is the full automated update flow.</p>
-  </div>
-
-  <h4>Repo-wide merge settings — squash-only</h4>
-
-  <p>Branch protection forces PRs to be the only way into <code>main</code>, but it doesn't control <em>how</em> the merge button behaves. Set the repo-wide settings so squash-merge is the only option:</p>
-
-  <ol>
-    <li>Open <code>https://github.com/&lt;you&gt;/ProdX/settings</code> (just the main settings page, not Branches).</li>
-    <li>Scroll to the <strong>Pull Requests</strong> section.</li>
-    <li>Set the three "Allow ..." checkboxes so only Squash is on:
-      <ul>
-        <li>⬜ <strong>Allow merge commits</strong> — uncheck.</li>
-        <li>✅ <strong>Allow squash merging</strong> — keep checked. Default merge-button becomes "Squash and merge". One commit per PR on <code>main</code>; clean linear history.</li>
-        <li>⬜ <strong>Allow rebase merging</strong> — uncheck (optional; keeps history strictly linear with the squash-only commits).</li>
-      </ul>
-    </li>
-    <li>Recommended:
-      <ul>
-        <li>✅ <strong>Always suggest updating pull request branches</strong> — surfaces the "Update branch" button when a PR is behind <code>main</code>.</li>
-        <li>✅ <strong>Automatically delete head branches</strong> — feature branches and Dependabot branches clean themselves up after merge. Combined with the feature-branch flow above, you never accumulate stale branches on the remote.</li>
-      </ul>
-    </li>
-    <li>Settings save automatically; no submit button.</li>
-  </ol>
-
-  <h3>Dependency freshness: 7-day cooldown via Dependabot</h3>
-  <p>Supply-chain attacks on package registries (npm, PyPI, Docker Hub / GHCR / GAR) have become routine — a compromised maintainer publishes a backdoored version of a popular library, and apps that auto-update overnight get owned before anyone notices. The community usually catches these within 24–48 hours and the bad version is yanked.</p>
-
-  <p>The defense is simple: <strong>don't adopt brand-new versions</strong>. The repo's <code>.github/dependabot.yml</code> configures Dependabot to delay every version-update PR by 7 days after release:</p>
-
-<pre><code>updates:
-  - package-ecosystem: "pip"        # backend/requirements*.txt
-    directory: "/backend"
-    schedule: { interval: "weekly", day: "monday" }
-    cooldown: { default-days: 7 }
-  - package-ecosystem: "npm"        # frontend/package.json
-    directory: "/frontend"
-    schedule: { interval: "weekly", day: "monday" }
-    cooldown: { default-days: 7 }
-  - package-ecosystem: "docker"     # base images (FROM ...)
-    directory: "/backend"
-    cooldown: { default-days: 7 }
-  - package-ecosystem: "docker"
-    directory: "/frontend"
-    cooldown: { default-days: 7 }
-  - package-ecosystem: "github-actions"   # uses: actions/checkout@v4 etc.
-    directory: "/"
-    cooldown: { default-days: 7 }</code></pre>
-
-  <h4>Dependabot's three features — what each one does</h4>
-
-  <p>Dependabot is actually three separate features bundled under one name. Knowing which does what avoids confusion:</p>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Feature</th>
-        <th>What it does</th>
-        <th>Cooldown?</th>
-        <th>How to enable</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>Dependabot alerts</strong></td>
-        <td>Notifies you in the Security tab when a CVE is published for a package you depend on. No PR; just a heads-up.</td>
-        <td>n/a</td>
-        <td>On by default for public repos</td>
-      </tr>
-      <tr>
-        <td><strong>Dependabot security updates</strong> 🛟</td>
-        <td>Opens a PR <em>immediately</em> with the version bump that fixes a published CVE. This is the "auto-fix" you actually want.</td>
-        <td><strong>No</strong> — security fixes bypass cooldown so you get the patch ASAP</td>
-        <td>Settings → Code security → <strong>Enable</strong> "Dependabot security updates" (single toggle, no config file)</td>
-      </tr>
-      <tr>
-        <td><strong>Dependabot version updates</strong></td>
-        <td>Opens routine PRs for non-security version bumps on a schedule (weekly here).</td>
-        <td>Yes — 7 days per our config</td>
-        <td>The <code>.github/dependabot.yml</code> file above</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div class="callout ok">
-    <p><strong>The combination is the point.</strong> Routine version updates wait 7 days so brand-new malicious releases get caught by the community first; security updates (where a CVE is already known) ship instantly because there's no upside to waiting. Different threat models, both addressed.</p>
-  </div>
-
-  <p>To enable both: GitHub repo → <strong>Settings → Code security</strong> → toggle on both "Dependabot security updates" and "Dependabot version updates". Free for public repos, built into GitHub (no third-party app to install). The version-updates toggle reads our <code>.github/dependabot.yml</code> for ecosystem + cooldown settings; the security-updates toggle has no config file — it's just on or off.</p>
-
-  <div class="callout warn">
-    <p><strong>Lockfiles are required for Dependabot security updates.</strong> If your repo doesn't commit a <code>package-lock.json</code> (npm), <code>poetry.lock</code> (poetry), <code>Pipfile.lock</code> (pipenv), or use hash-pinned <code>requirements.txt</code>, Dependabot doesn't know which exact version you're running. Security updates fail with <em>"Dependabot can't update vulnerable dependencies for projects without a lockfile or pinned version requirement."</em></p>
-    <p>This project commits <code>frontend/package-lock.json</code> and pins exact versions in <code>backend/requirements.txt</code> (e.g. <code>fastapi==0.136.1</code>) for exactly this reason. The lockfile also lets CI use <code>npm ci</code> (reproducible install from the lockfile) and turn on the <code>actions/setup-node</code> npm cache.</p>
-  </div>
-
-  <h4>Layered defense — how the four security gates fit together</h4>
-
-  <table>
-    <thead>
-      <tr><th>Gate</th><th>When</th><th>What it catches</th><th>What it does</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Dependabot version updates</td>
-        <td>Weekly</td>
-        <td>Stale deps (out-of-date packages with no known exploit yet)</td>
-        <td>Opens routine update PRs (after 7-day cooldown)</td>
-      </tr>
-      <tr>
-        <td>Dependabot security updates</td>
-        <td>On CVE publication</td>
-        <td>Known-vulnerable deps you already use</td>
-        <td>Opens immediate fix PR (no cooldown)</td>
-      </tr>
-      <tr>
-        <td><code>pip-audit</code> / <code>npm audit</code></td>
-        <td>Every commit (CI)</td>
-        <td>Known-vulnerable deps in <code>requirements.txt</code> / <code>package.json</code></td>
-        <td>Fails the CI gate; blocks the image build</td>
-      </tr>
-      <tr>
-        <td>Trivy image scan</td>
-        <td>Every commit (CI)</td>
-        <td>OS-package + library CVEs in the built image</td>
-        <td>Fails the CI gate; blocks the push to Artifact Registry</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <p>Dependabot is the <em>autonomic</em> layer (opens fix PRs without you asking). pip-audit/npm audit and Trivy are the <em>reactive</em> layer (a human pushed code; gate runs; bad deps don't merge or ship). All four operate independently and complement each other.</p>
-</section>
-
-<section id="identity">
-  <h2><span class="step">07</span>Google Cloud setup</h2>
-
-  <p>Terraform manages everything we need inside GCP: the project, API enablement, the cluster, IAM, networking. The only things you do by hand are the two that genuinely can't be Terraformed: signing up for the free trial (billing account creation needs a payment method) and authenticating gcloud locally.</p>
-
-  <table>
-    <thead><tr><th>Resource</th><th>Terraformable?</th><th>Notes</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Billing account</strong></td><td>❌ No</td><td>You enter a payment method in the Console. Free trial credit attaches here.</td></tr>
-      <tr><td>Project</td><td>✅ Yes</td><td><code>google_project</code> — handled by <code>envs/bootstrap</code>. Created under <em>no organization</em>, billed directly to your billing account.</td></tr>
-      <tr><td>API enablement</td><td>✅ Yes</td><td><code>google_project_service</code> — handled by <code>envs/bootstrap</code>.</td></tr>
-      <tr><td>Cluster, IAM, networking, everything else</td><td>✅ Yes</td><td><code>envs/dev</code> takes over from here.</td></tr>
-    </tbody>
-  </table>
-
-  <div class="callout note">
-    <p><strong>Why no GCP Organization?</strong> An Org is only required if you want org-level features (org-level IAM policies, shared VPCs, organization tags, etc.). For a single-developer capstone, all of that is overkill — and provisioning one requires Cloud Identity / Workspace setup for a domain you own, which adds 30–60 minutes of manual setup with its own failure modes (auto-orgs going into <code>DELETE_REQUESTED</code>, IAM grant chasing, etc.). Skipping the org keeps things simple. See the appendix at the bottom of this section if you want to go down that path anyway.</p>
-  </div>
-
-  <h3>7.1 — Claim the free trial credit</h3>
-  <p>If you don't already have a billing account: sign up at <a href="https://cloud.google.com/free">cloud.google.com/free</a> and claim the $300 / 90-day trial. The trial creates a billing account; we'll create the project itself with Terraform in step 10.</p>
-
-  <h3>7.2 — Install and authenticate gcloud</h3>
-<pre><code># Install via Google's apt repo (one-time)
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-  | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
-  | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
-sudo apt update &amp;&amp; sudo apt install -y google-cloud-cli
-
-# Authenticate (opens browser; if you're on a headless server, see 'gcloud auth login --no-browser')
+<div class="hero">
+  <h1>ProdX — Complete Setup Guide</h1>
+  <p>Everything you need to take this project from <b>zero</b> to a <b>live website</b> — written so anyone can follow it, even with no DevOps background.</p>
+  <p style="font-size:.9rem;opacity:.85;">Plan ~1 hour the first time. Most of that is waiting for the cloud cluster to build.</p>
+</div>
+
+<div class="note info">
+  <span class="lbl">How to read this guide</span>
+  Do the sections <b>in order, top to bottom</b>. Steps 1–7 get you ready. Step 8 builds
+  everything. Anything in a dark box is a command — copy it (use the <b>Copy</b> button),
+  paste it into your terminal, press <span class="kbd">Enter</span>. Replace anything
+  written like <code>YOUR-SOMETHING</code> with your own value.
+</div>
+
+<!-- ============================================================= -->
+<h2 id="what">1 · What is ProdX?</h2>
+
+<p>ProdX is a small web app (a product catalog) that runs on real cloud infrastructure.
+The whole thing is split into <b>three GitHub repositories</b>, each with one job:</p>
+
+<table>
+  <tr><th>Repository</th><th>What it holds</th><th>Think of it as…</th></tr>
+  <tr><td><b>ProdX</b></td><td>The application code — the backend API and the website.</td><td>The product</td></tr>
+  <tr><td><b>ProdXTF</b></td><td>Terraform code that builds the cloud infrastructure.</td><td>The construction plan</td></tr>
+  <tr><td><b>ProdXCD</b></td><td>The Helm chart describing what runs inside the cluster.</td><td>The furniture layout</td></tr>
+</table>
+
+<p>When everything is running you get three public web addresses (on a domain you own):</p>
+<ul class="clean">
+  <li><code>https://prodx.YOUR-DOMAIN</code> — the website</li>
+  <li><code>https://prodxapi.YOUR-DOMAIN</code> — the backend API</li>
+  <li><code>https://argocd.YOUR-DOMAIN</code> — the deployment dashboard (Argo CD)</li>
+</ul>
+
+<div class="note tip">
+  <span class="lbl">You don't need to understand the jargon</span>
+  Words like <i>Kubernetes</i>, <i>Terraform</i> or <i>Helm</i> are explained in plain English
+  in the <a href="#glossary">Glossary</a> at the bottom. You can finish this guide without
+  reading it — just follow the steps.
+</div>
+
+<!-- ============================================================= -->
+<h2 id="accounts">2 · Accounts you need</h2>
+
+<p>Create these five accounts first. All of them are free to start.</p>
+
+<table>
+  <tr><th>Account</th><th>What it's for</th><th>Sign up</th></tr>
+  <tr>
+    <td><b>GitHub</b></td>
+    <td>Stores the three code repositories.</td>
+    <td><a href="https://github.com/join">github.com/join</a></td>
+  </tr>
+  <tr>
+    <td><b>Google Cloud</b></td>
+    <td>Runs the actual servers (the Kubernetes cluster).</td>
+    <td><a href="https://cloud.google.com/free">cloud.google.com/free</a></td>
+  </tr>
+  <tr>
+    <td><b>Cloudflare</b></td>
+    <td>Gives the app real HTTPS web addresses. <b>You also need a domain name</b> added to Cloudflare.</td>
+    <td><a href="https://dash.cloudflare.com/sign-up">dash.cloudflare.com</a></td>
+  </tr>
+  <tr>
+    <td><b>HCP Terraform</b></td>
+    <td>Safely stores the "memory" of what infrastructure exists.</td>
+    <td><a href="https://app.terraform.io">app.terraform.io</a></td>
+  </tr>
+  <tr>
+    <td><b>HashiCorp Vault</b></td>
+    <td>A secure vault that holds passwords the app needs. This project uses a Vault server
+        already running at <code>https://vault.pbcv.dev</code>.</td>
+    <td>Use an existing Vault server (you need a login for it).</td>
+  </tr>
+</table>
+
+<div class="note warn">
+  <span class="lbl">Google Cloud — the $300 free trial</span>
+  When you sign up, Google gives you <b>$300 of free credit</b> that lasts ~90 days.
+  It asks for a credit card to verify you (a tiny charge may appear and is refunded).
+  This project costs only a few dollars a month if you remember to
+  <a href="#pause">pause it</a> when you're not using it — well within the free credit.
+</div>
+
+<div class="note info">
+  <span class="lbl">About the domain name</span>
+  Cloudflare needs a domain you own (e.g. from Namecheap, GoDaddy, Cloudflare itself…).
+  After buying it, add it to Cloudflare and switch your domain's <b>nameservers</b> to the
+  two Cloudflare gives you. This guide's reference setup uses <code>pbcv.dev</code> —
+  you will use your own.
+</div>
+
+<!-- ============================================================= -->
+<h2 id="tools">3 · Install the tools</h2>
+
+<p>These are small programs that run on <b>your computer</b>. Open a terminal and install them.</p>
+
+<h3>Windows (PowerShell, "Run as administrator")</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>winget install HashiCorp.Terraform
+winget install Google.CloudSDK
+winget install Kubernetes.kubectl
+winget install Helm.Helm
+winget install HashiCorp.Vault
+gcloud components install gke-gcloud-auth-plugin</pre>
+</div>
+
+<h3>macOS (with Homebrew)</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>brew install terraform kubectl helm vault
+brew install --cask google-cloud-sdk
+gcloud components install gke-gcloud-auth-plugin</pre>
+</div>
+
+<h3>Linux / WSL (Ubuntu or Debian)</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre><span class="c"># Terraform + Vault (from HashiCorp's package repo)</span>
+curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt-get update
+sudo apt-get install -y terraform vault
+
+<span class="c"># Then install gcloud, kubectl and helm from their official guides:</span>
+<span class="c">#   https://cloud.google.com/sdk/docs/install</span>
+<span class="c">#   https://kubernetes.io/docs/tasks/tools/</span>
+<span class="c">#   https://helm.sh/docs/intro/install/</span>
+gcloud components install gke-gcloud-auth-plugin</pre>
+</div>
+
+<p>Check that the main tools are installed:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>terraform version
+gcloud version
+kubectl version --client
+vault version</pre>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="fork">4 · Fork the three repositories</h2>
+
+<p>"Forking" makes your own copy of a repository on GitHub. Do it for all three:</p>
+
+<ol class="clean">
+  <li>Open each repo and click the <b>Fork</b> button (top-right):
+    <ul class="clean">
+      <li><a href="https://github.com/DemOnJR/ProdX">github.com/DemOnJR/ProdX</a></li>
+      <li><a href="https://github.com/DemOnJR/ProdXTF">github.com/DemOnJR/ProdXTF</a></li>
+      <li><a href="https://github.com/DemOnJR/ProdXCD">github.com/DemOnJR/ProdXCD</a></li>
+    </ul>
+  </li>
+  <li>Then download all three to your computer (replace <code>YOUR-GITHUB-USERNAME</code>):</li>
+</ol>
+
+<div class="code">
+<button class="copy">Copy</button>
+<pre>git clone https://github.com/YOUR-GITHUB-USERNAME/ProdX.git
+git clone https://github.com/YOUR-GITHUB-USERNAME/ProdXTF.git
+git clone https://github.com/YOUR-GITHUB-USERNAME/ProdXCD.git</pre>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="login">5 · Log in to everything</h2>
+
+<p>These commands connect the tools on your computer to your cloud accounts.
+Each one opens a browser window — approve it and come back to the terminal.</p>
+
+<h3>Google Cloud</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre><span class="c"># 1. Log in as yourself</span>
 gcloud auth login
-gcloud auth application-default login</code></pre>
 
-  <div class="callout ok">
-    <p><strong>Why both <code>auth</code> commands?</strong></p>
-    <ul>
-      <li><code>gcloud auth login</code> — credentials for the <code>gcloud</code> CLI itself (kubectl, project switches, etc.).</li>
-      <li><code>gcloud auth application-default login</code> — credentials Terraform's google provider picks up automatically.</li>
+<span class="c"># 2. Give Terraform permission to act on your behalf</span>
+gcloud auth application-default login</pre>
+</div>
+<p>The first command logs <i>you</i> in. The second creates a separate credential that
+<b>Terraform</b> uses automatically — you need both.</p>
+
+<h3>HCP Terraform</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>terraform login</pre>
+</div>
+<p>Type <code>yes</code>, approve in the browser. This saves a token so Terraform can store
+its state safely online.</p>
+
+<h3>HashiCorp Vault</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>export VAULT_ADDR=https://vault.pbcv.dev
+vault login</pre>
+</div>
+<p>On Windows PowerShell use <code>$env:VAULT_ADDR="https://vault.pbcv.dev"</code> instead of
+the <code>export</code> line. Logging in saves a token to <code>~/.vault-token</code> that
+Terraform and the <code>vault</code> command both pick up automatically.</p>
+
+<h3>Cloudflare</h3>
+<p>Cloudflare has no login command — you connect to it with an <b>API token</b> instead.
+You'll create that token in the next step.</p>
+
+<!-- ============================================================= -->
+<h2 id="keys">6 · Collect your keys &amp; IDs</h2>
+
+<p>Now gather every value the project needs. Keep them in a scratch note —
+you'll paste them into config files in Step 8.</p>
+
+<h3>The full checklist</h3>
+<table>
+  <tr><th>Value</th><th>Where to get it</th></tr>
+  <tr><td><b>Google billing account ID</b><br><span style="color:var(--faint)">looks like <code>01ABCD-234567-89EFGH</code></span></td>
+      <td>Run <code>gcloud billing accounts list</code> — use the row where <code>OPEN</code> is <code>True</code>.</td></tr>
+  <tr><td><b>GCP project ID</b></td>
+      <td>You <i>invent</i> this. Lowercase letters, digits and dashes, globally unique — e.g. <code>prodx-dev-7421</code>.</td></tr>
+  <tr><td><b>HCP Terraform organization name</b></td>
+      <td>The organization you created at <a href="https://app.terraform.io">app.terraform.io</a>.</td></tr>
+  <tr><td><b>Your domain name</b></td>
+      <td>The domain you added to Cloudflare — e.g. <code>example.com</code>.</td></tr>
+  <tr><td><b>Cloudflare Account ID</b><br>&amp; <b>Zone ID</b></td>
+      <td>At <a href="https://dash.cloudflare.com">dash.cloudflare.com</a>, click your domain.
+          The right-hand sidebar shows both IDs — copy them.</td></tr>
+  <tr><td><b>Cloudflare API token</b></td>
+      <td>See the step-by-step below.</td></tr>
+  <tr><td><b>GitHub username</b></td>
+      <td>Your GitHub handle.</td></tr>
+  <tr><td><b>GitHub access token (PAT)</b></td>
+      <td>See the step-by-step below.</td></tr>
+  <tr><td><b>Database password</b></td>
+      <td>You <i>invent</i> this — pick a strong password for the app's database.</td></tr>
+</table>
+
+<h3>How to create the Cloudflare API token</h3>
+<ol class="clean">
+  <li>Make sure your domain is already added to Cloudflare and its nameservers are switched
+      (see the note in <a href="#accounts">Step 2</a>).</li>
+  <li>Go to <a href="https://dash.cloudflare.com/profile/api-tokens">dash.cloudflare.com/profile/api-tokens</a>
+      → <b>Create Token</b>.</li>
+  <li>Start from the <b>"Edit zone DNS"</b> template.</li>
+  <li>Add two more permissions to that template:
+    <ul class="clean">
+      <li><b>Account</b> → <b>Cloudflare Tunnel</b> → <b>Edit</b></li>
+      <li><b>Zone</b> → <b>DNS</b> → <b>Edit</b> &nbsp;(under <i>Zone Resources</i>, limit it to your domain)</li>
     </ul>
-  </div>
-
-  <h3>7.3 — Capture your billing account ID</h3>
-<pre><code>gcloud billing accounts list</code></pre>
-
-  <p>Copy the <code>ACCOUNT_ID</code> column (format <code>XXXXXX-XXXXXX-XXXXXX</code>) of the row marked <code>OPEN: True</code>. You'll paste this into <code>envs/bootstrap/terraform.tfvars</code> in step 10.</p>
-
-  <div class="callout warn">
-    <p><strong>The "environment tag" warning.</strong> After step 10 creates your project, <code>gcloud config set project</code> will print a warning that the project lacks an <code>environment</code> tag. <strong>Ignore it.</strong> That warning is benign — environment tags are org-scoped, and parentless projects (which is what we create) literally cannot have one bound. There is no action you can take to silence it short of moving to an org-based setup.</p>
-  </div>
-
-  <h3>Appendix — full org-based IaC (optional, ~60+ extra minutes)</h3>
-  <p>If you want the full IaC story with an environment tag bound by Terraform: set up <a href="https://workspace.google.com/business/signup/welcome?sku=identitybasic">Cloud Identity Free</a> for a domain you own, verify the domain via DNS TXT, capture <code>gcloud organizations list</code>'s ID, then grant yourself <code>roles/resourcemanager.projectCreator</code> + <code>roles/resourcemanager.tagAdmin</code> + <code>roles/billing.user</code> via <code>gcloud organizations add-iam-policy-binding</code> on the org. Then put <code>org_id</code> back in the bootstrap module and re-add the <code>google_tags_tag_key</code>/<code>value</code>/<code>binding</code> resources. None of this is required for the cluster work that follows.</p>
-</section>
-
-<section id="hcp">
-  <h2><span class="step">08</span>HCP Terraform setup</h2>
-
-  <p>"Terraform Cloud" was renamed to "HCP Terraform" in 2024 — same product, same free tier (up to 5 users).</p>
-
-  <h3>What is HCP Terraform actually doing for us?</h3>
-
-  <p>If you've only used Terraform locally before, the natural question is "why do I need an extra service?". For this project, HCP Terraform plays exactly <strong>one</strong> role in the default (Local execution mode) setup:</p>
-
-  <ul>
-    <li><strong>It stores the Terraform state file</strong> — a JSON document that maps every resource in your <code>.tf</code> code to its real-world counterpart (this GCP project, that GKE cluster, those K8s resources, etc.). Without remote state, that JSON lives in <code>terraform.tfstate</code> on your laptop. Lose your laptop, lose your state, and Terraform has no idea what's already provisioned — you'd have to <code>terraform import</code> everything by hand. HCP keeps it safe.</li>
-  </ul>
-
-  <p>That's the whole job for now. Specifically, HCP <strong>is not</strong>:</p>
-
-  <ul>
-    <li><strong>Running terraform commands</strong> — that's still happening on your laptop (Execution Mode = Local). HCP's runners do nothing.</li>
-    <li><strong>Holding your GCP credentials</strong> — they're in your local <code>gcloud</code> ADC, never uploaded.</li>
-    <li><strong>Watching your repo or auto-applying</strong> — that would be VCS-driven mode, which we're not using.</li>
-    <li><strong>Doing policy enforcement</strong> (Sentinel) or cost estimation — paid-tier features.</li>
-  </ul>
-
-  <p>What you get for free even in this minimal mode:</p>
-  <ul>
-    <li><strong>State locking</strong> — only one <code>terraform apply</code> can run at a time per workspace. Prevents corruption if two people apply simultaneously.</li>
-    <li><strong>State versioning</strong> — every apply creates a new state version in the UI. You can browse history, see diffs, and roll back if something goes very wrong.</li>
-    <li><strong>Secret-safe variables</strong> (if you choose to upload any) — workspace variables marked sensitive are encrypted at rest.</li>
-    <li><strong>A web UI showing your infrastructure</strong> — resource list, drift detection, run history.</li>
-  </ul>
-
-  <p>Upgrade path: when you want CI to run terraform on your behalf, you switch the workspace to <strong>Remote</strong> execution and upload credentials (or use Workload Identity Federation with GCP — short-lived tokens, no static key). Same workspaces, same state, just a different runner.</p>
-
-  <h3>Create the two workspaces</h3>
-  <p>This project uses two workspaces because we have two Terraform root configurations (<code>envs/bootstrap</code> and <code>envs/dev</code>), each with independent state. Workspaces in HCP map 1:1 to root configs.</p>
-
-  <ol>
-    <li>Sign up at <a href="https://app.terraform.io/signup/account">app.terraform.io/signup/account</a>.</li>
-    <li><strong>Create an organization</strong> — e.g. <code>prodx-demonjr</code>. Note the org name.</li>
-    <li><strong>Create two CLI-driven workspaces</strong>:
-      <ul>
-        <li><code>prodx-bootstrap</code> — holds state for the project + tags.</li>
-        <li><code>prodx-dev</code> — holds state for the cluster + Argo CD + Cloudflare Tunnel.</li>
-      </ul>
-      For each: type <strong>CLI-driven workflow</strong> (not VCS, not API).
-    </li>
-    <li>For <em>each</em> workspace: open it → <strong>Settings → General → Execution Mode → Local</strong> → <strong>Save settings</strong>.
-      <div class="callout danger">
-        <p><strong>Most-missed step.</strong> New workspaces default to <strong>Remote</strong> execution mode even when created as CLI-driven. If you skip the dropdown change, <code>terraform plan</code> errors with <em>"could not find default credentials"</em> because HCP's runners try to use ADC — which only exists on your laptop. The fix is always: change Execution Mode to Local in this exact settings page, then re-run.</p>
-      </div>
-      <div class="callout note">
-        <p><strong>Why local execution?</strong> Remote execution requires uploading GCP + Cloudflare credentials to HCP Terraform. Local execution runs <code>terraform apply</code> on your machine using your <code>gcloud</code> ADC and your <code>terraform.tfvars</code>; only the state file lives in HCP. Simpler to start with — we can switch to remote execution + workload identity federation later.</p>
-      </div>
-    </li>
-    <li>On your machine, install Terraform from HashiCorp's apt repo and log into HCP:
-<pre><code># One-time: add HashiCorp's signed apt repo
-wget -O- https://apt.releases.hashicorp.com/gpg \
-  | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
-  | sudo tee /etc/apt/sources.list.d/hashicorp.list
-sudo apt update &amp;&amp; sudo apt install -y terraform
-
-terraform login</code></pre>
-      A browser window opens, you approve, and a token is written to <code>~/.terraform.d/credentials.tfrc.json</code>.</li>
-  </ol>
-
-  <h3>Wire the backend to your org</h3>
-  <p>Edit <strong>both</strong> <code>versions.tf</code> files and replace <code>REPLACE_ME_TFC_ORG</code> with your HCP Terraform org name:</p>
-<pre><code># ProdXTF/envs/bootstrap/versions.tf
-cloud {
-  organization = "REPLACE_ME_TFC_ORG"   ← change to your HCP Terraform org name
-  workspaces {
-    name = "prodx-bootstrap"
-  }
-}
-
-# ProdXTF/envs/dev/versions.tf
-cloud {
-  organization = "REPLACE_ME_TFC_ORG"   ← same org name here
-  workspaces {
-    name = "prodx-dev"
-  }
-}</code></pre>
-
-  <h3>Can Terraform run in the cloud instead of on my laptop?</h3>
-
-  <p><strong>Yes.</strong> HCP Terraform supports three execution modes; the project ships with the simplest one but switching is one dropdown + uploading credentials.</p>
-
-  <table>
-    <thead><tr><th>Mode</th><th>Where TF runs</th><th>What HCP needs from you</th><th>Trigger</th></tr></thead>
-    <tbody>
-      <tr>
-        <td><strong>Local</strong> <em>(default in this project)</em></td>
-        <td>Your laptop</td>
-        <td>Nothing — local <code>gcloud</code> ADC is used</td>
-        <td>You run <code>terraform apply</code></td>
-      </tr>
-      <tr>
-        <td><strong>Remote, CLI-driven</strong></td>
-        <td>HCP-hosted Linux runner</td>
-        <td>GCP credentials (service account JSON or OIDC), Cloudflare-related env vars if any</td>
-        <td>You run <code>terraform apply</code> — it streams from HCP to your terminal</td>
-      </tr>
-      <tr>
-        <td><strong>Remote, VCS-driven</strong></td>
-        <td>HCP-hosted Linux runner</td>
-        <td>Same credentials + a connection to GitHub/GitLab/Bitbucket</td>
-        <td>Git push triggers <code>plan</code> on PRs and <code>apply</code> on merges to <code>main</code></td>
-      </tr>
-    </tbody>
-  </table>
-
-  <h4>Switching this project to Remote execution</h4>
-
-  <ol>
-    <li>HCP Terraform → workspace <code>prodx-dev</code> → Settings → General → <strong>Execution Mode = Remote</strong> → Save.</li>
-    <li>Workspace → Variables → Add a variable:
-      <ul>
-        <li><strong>Key:</strong> <code>GOOGLE_CREDENTIALS</code></li>
-        <li><strong>Value:</strong> the JSON contents of a GCP service account key (download from Console → IAM → Service Accounts → Keys → Add Key → JSON). The SA needs <code>roles/owner</code> on the <code>prodx-dev</code> project, or a more minimal set covering <code>compute.*</code> + <code>container.*</code> + <code>iam.*</code>.</li>
-        <li><strong>Category:</strong> Environment variable</li>
-        <li><strong>Sensitive:</strong> ✅ checked (encrypted at rest, never shown again)</li>
-      </ul>
-    </li>
-    <li>Run <code>terraform apply</code> as before — output now comes from HCP's runners. State stays where it already was.</li>
-  </ol>
-
-  <p><strong>Hardened variant: GCP Workload Identity Federation</strong> — instead of a static SA key, HCP exchanges a short-lived OIDC token for a temporary GCP credential. No static secret to rotate or leak. HashiCorp has a <a href="https://developer.hashicorp.com/terraform/cloud-docs/workspaces/dynamic-provider-credentials/gcp-configuration">step-by-step guide</a>; the setup is a one-time 15-minute extra but eliminates the SA-key lifecycle entirely.</p>
-
-  <p><strong>What you trade for it:</strong></p>
-  <ul>
-    <li>✅ No GCP credentials on your laptop (or any laptop)</li>
-    <li>✅ Audit log of every run (who, when, what changed)</li>
-    <li>✅ With VCS-driven mode: <code>git push</code> = automated apply, no human in the loop</li>
-    <li>⚠️ Each plan/apply waits for a runner to start (~10–30s cold start)</li>
-    <li>⚠️ Secrets you previously kept local (CF token) live in HCP now — you trust HCP, not just your laptop</li>
-    <li>⚠️ Iterating on TF code is slower (no instant feedback from local <code>plan</code>)</li>
-  </ul>
-
-  <div class="callout note">
-    <p><strong>Why this project ships with Local execution.</strong> The capstone scope is one student building the pipeline end-to-end; the credential upload + the slower iteration loop add friction without value at that scale. Remote execution becomes the right answer once more than one person needs to apply, or once you want CI to do it automatically on Git push.</p>
-  </div>
-</section>
-
-<section id="cloudflare">
-  <h2><span class="step">09</span>Cloudflare setup</h2>
-
-  <p>The dev env runs <code>cloudflared</code> in the cluster but the tunnel, DNS records, and ingress rules are configured in the Cloudflare Zero Trust dashboard. Less IaC than calling the CF API from Terraform — but no CF API token to manage and no chicken-and-egg between tunnel creation and DNS.</p>
-
-  <h3>9.1 — Add the zone</h3>
-  <p>Your domain (<code>pbcv.dev</code> in this tutorial) must be a zone in your Cloudflare account. If it isn't yet: dashboard → <strong>Add a site</strong> → pick the Free plan → change nameservers at your registrar to the two CF nameservers shown. Wait until CF reports the zone as <em>Active</em> (usually under an hour).</p>
-
-  <h3>9.2 — Create a tunnel</h3>
-  <ol>
-    <li>Open <a href="https://one.dash.cloudflare.com">one.dash.cloudflare.com</a> (Zero Trust dashboard).</li>
-    <li>Left sidebar → <strong>Networks → Tunnels</strong>.</li>
-    <li><strong>Create a tunnel</strong> → <strong>Cloudflared</strong> → name it <code>prodx-dev</code> → Save tunnel.</li>
-    <li>The next page ("Install and run a connector") shows a <code>docker run</code> command. <strong>Copy the long string that comes after <code>--token</code></strong> — that's your tunnel run token. Save it somewhere; we'll paste it into <code>envs/dev/terraform.tfvars</code> in step 11.</li>
-    <li>You can ignore the rest of that page — Cloudflare expects you to run their docker command manually, but Terraform will deploy a Kubernetes Deployment with the same image and token instead. Click <strong>Next</strong> at the bottom of the page.</li>
-  </ol>
-
-  <h3>9.3 — Add Public Hostnames</h3>
-  <p>Still inside the tunnel's setup wizard (or later via the tunnel's <strong>Public Hostnames</strong> tab), add three entries. CF auto-creates the DNS CNAME records for each.</p>
-  <table>
-    <thead><tr><th>Subdomain</th><th>Domain</th><th>Service type</th><th>URL</th></tr></thead>
-    <tbody>
-      <tr><td><code>argocd</code></td><td><code>pbcv.dev</code></td><td>HTTP</td><td><code>argocd-server.argocd.svc.cluster.local:80</code></td></tr>
-      <tr><td><code>prodx</code></td><td><code>pbcv.dev</code></td><td>HTTP</td><td><code>prodx-web.prodx.svc.cluster.local:80</code></td></tr>
-      <tr><td><code>prodxapi</code></td><td><code>pbcv.dev</code></td><td>HTTP</td><td><code>prodx-api.prodx.svc.cluster.local:8000</code></td></tr>
-    </tbody>
-  </table>
-
-  <div class="callout note">
-    <p>The argocd hostname will work right after the dev apply finishes. <code>prodx</code> and <code>prodxapi</code> will return 502 (correctly — the services don't exist yet) until ProdXCD deploys those workloads. No DNS changes needed when the services come up; cloudflared retries on every request.</p>
-  </div>
-
-  <div class="callout danger">
-    <p><strong>Tunnel token is a secret.</strong> Don't paste it into Git, screenshots, or public chat. It goes into <code>terraform.tfvars</code>, which is gitignored. If a token ends up somewhere it shouldn't, delete the tunnel in CF (the token dies with it) and create a new one.</p>
-  </div>
-</section>
-
-<section id="bootstrap">
-  <h2><span class="step">10</span>terraform apply: bootstrap</h2>
-
-  <p>The one-time apply that creates the GCP project under no organization and enables the 5 APIs we need on it. State goes to the <code>prodx-bootstrap</code> HCP Terraform workspace. 6 resources total, ~3 minutes (project creation is the slow part).</p>
-
-  <h3>Fill in the tfvars</h3>
-<pre><code>cd ProdXTF/envs/bootstrap
-cp terraform.tfvars.example terraform.tfvars
-$EDITOR terraform.tfvars         # or nano / vim</code></pre>
-
-  <p>One required value — the billing account ID from step 7.3:</p>
-<pre><code>billing_account = "XXXXXX-XXXXXX-XXXXXX"
-# project_id   = "prodx-dev"     # default; must be globally unique across all of GCP
-# project_name = "ProdX Dev"</code></pre>
-
-  <h3>Pre-flight: clear any stale quota project from ADC</h3>
-  <p>If you've used gcloud with a previous project, your ADC may have a <code>quota_project_id</code> pinned that points to a project you've since deleted. When TF tries to bill API calls to that ghost project, every call fails with "project not found". Clear it before <code>init</code>:</p>
-<pre><code># Check first — prints '1' if set, '0' if not
-grep -c quota_project_id ~/.config/gcloud/application_default_credentials.json
-
-# If it printed '1', remove the field:
-sudo apt install -y jq    # if jq isn't installed (Linux/WSL)
-jq 'del(.quota_project_id)' ~/.config/gcloud/application_default_credentials.json \
-  &gt; /tmp/adc.json &amp;&amp; mv /tmp/adc.json ~/.config/gcloud/application_default_credentials.json</code></pre>
-
-  <div class="callout note">
-    <p>Safe: <code>jq 'del(.quota_project_id)'</code> only removes that one field. Refresh token and account info are untouched. We'll re-pin the quota project to the new <code>prodx-dev</code> right after apply succeeds.</p>
-  </div>
-
-  <h3>Apply</h3>
-<pre><code>terraform init
-terraform apply</code></pre>
-
-  <p>Takes ~3 minutes (project creation is the slow part; API enablement is seconds each, run in parallel). Outputs include the new <code>project_id</code> and <code>project_number</code>.</p>
-
-  <div class="callout warn">
-    <p><strong>Common first-apply failures:</strong></p>
-    <ul>
-      <li><strong>"could not find default credentials"</strong> — the HCP workspace is still on Remote execution. Go back to step 8 and switch Execution Mode to Local.</li>
-      <li><strong>"project not found" on every call</strong> — ADC's <code>quota_project_id</code> is pinned to a deleted project. Run the <code>jq del</code> command above.</li>
-      <li><strong>"Permission 'resourcemanager.projects.create' denied"</strong> — your gcloud account is associated with a GCP Organization (Workspace, Cloud Identity, or company tenant) that requires projects to be created under it, and you don't have <code>projectCreator</code> on that org. Quick test: <code>gcloud projects create test-$(date +%s)</code> — if that fails too, the issue is account-level, not Terraform. See the appendix at the end of step 7.</li>
-    </ul>
-  </div>
-
-  <h3>Pin gcloud + ADC to the new project</h3>
-  <p>Now that the project exists, point gcloud at it (and pin ADC's quota project so no quota warnings):</p>
-<pre><code>gcloud config set project $(terraform output -raw project_id)
-gcloud auth application-default set-quota-project $(terraform output -raw project_id)</code></pre>
-
-  <div class="callout warn">
-    <p>gcloud will still print the <code>environment</code> tag warning. <strong>Ignore it</strong> — see step 7.3 for why. It's purely cosmetic on parentless projects.</p>
-  </div>
-</section>
-
-<section id="apply">
-  <h2><span class="step">11</span>terraform apply: dev</h2>
-
-  <h3>Create your local tfvars file</h3>
-<pre><code>cd ../dev
-cp terraform.tfvars.example terraform.tfvars
-$EDITOR terraform.tfvars</code></pre>
-
-  <p>Two required values:</p>
-<pre><code>project_id               = "prodx-dev"           # from bootstrap output
-cloudflared_tunnel_token = "eyJh..."             # from step 9.2 (long JWT)</code></pre>
-
-  <p>Defaults take care of region (<code>europe-west3</code>), node count, machine type (<code>e2-small</code> spot), Argo CD chart version, etc. Override in the same file if you want different values.</p>
-
-  <h3>Initialize</h3>
-<pre><code>terraform init</code></pre>
-  <p>Downloads the google, kubernetes, and helm providers and configures the HCP Terraform backend. Takes 20–60 seconds the first time.</p>
-
-  <h3>First apply (three stages on a fresh state)</h3>
-  <p>Two independent chicken-and-eggs on a fresh state — both verified the hard way by running <code>terraform destroy</code> followed by <code>terraform apply</code> end-to-end. The correct order is:</p>
-<pre><code># Stage 1 — VPC + GKE cluster + node pool (~14 min; control plane is the slow part)
-terraform apply -target=module.network -target=module.cluster
-
-# Stage 2a — Argo CD Helm release (installs the argoproj.io CRDs the next step
-# needs) + cloudflared Deployment (~8 min; helm wait + cloudflared image pull)
-terraform apply -target=module.argocd -target=module.cloudflared
-
-# Stage 2b — the root Argo CD Application that points at ProdXCD (~1 second:
-# just a CR creation; the actual workload sync happens inside Argo afterward)
-terraform apply</code></pre>
-
-  <p><strong>One-liner for the lazy</strong> — chain all three with <code>&amp;&amp;</code> so a failure in any stage stops the chain. Total ~22 minutes hands-off; safe to walk away:</p>
-<pre><code>terraform apply -target=module.network -target=module.cluster -auto-approve \
-  &amp;&amp; terraform apply -target=module.argocd -target=module.cloudflared -auto-approve \
-  &amp;&amp; terraform apply -auto-approve</code></pre>
-
-  <p>What goes wrong if you skip a stage:</p>
-  <ul>
-    <li><strong>Skipping stage 1</strong> — the <code>kubernetes</code> and <code>helm</code> providers try to talk to a cluster endpoint that doesn't exist yet → <em>"Kubernetes cluster unreachable"</em>.</li>
-    <li><strong>Skipping stage 2a</strong> (going stage 1 → bare <code>apply</code>) — the <code>kubernetes_manifest.prodx_root_app</code> resource validates its <code>apiVersion: argoproj.io/v1alpha1</code> against the cluster's discovery API at <em>plan time</em>. Argo CD's CRDs aren't installed yet, so the plan errors with <em>"no matches for kind Application in group argoproj.io"</em>.</li>
-  </ul>
-
-  <p>After the first full apply, every subsequent <code>terraform apply</code> is a single bare command and usually finishes in under a minute unless you touched the cluster config.</p>
-
-  <div class="callout note">
-    <p><strong>Why the staged dance only on the first run?</strong> After the cluster + helm release exist, every provider can introspect what it needs at plan time and one pass suffices. The chicken-and-eggs are purely a bootstrap concern — they don't recur.</p>
-  </div>
-
-  <h3>What "prod" would look like</h3>
-
-  <p>The split between <code>envs/dev</code> and the (hypothetical) <code>envs/prod</code> is the canonical Terraform pattern for multiple deployment environments: <strong>same modules, different variable values, different state files</strong>. We currently ship just the dev env because a single-developer capstone doesn't need more, but the directory structure makes adding prod a copy-and-tune exercise — no module changes required.</p>
-
-  <p>Concrete shape, if you ever scale up:</p>
-
-<pre><code>ProdXTF/
-├── envs/
-│   ├── bootstrap/      (run once — creates the GCP project)
-│   ├── dev/            (cheap, small, ephemeral; what we have)
-│   ├── staging/        (optional — mirror of prod for pre-merge checks)
-│   └── prod/           (the real one — customer-facing)
-└── modules/            (SAME modules used by every env)
-    ├── network/
-    ├── cluster/
-    ├── argocd/
-    └── cloudflared/</code></pre>
-
-  <p>Each env reads the same <code>modules/</code> but with different variable values:</p>
-
-  <table>
-    <thead><tr><th>Setting</th><th>dev (what we ship)</th><th>prod (illustrative)</th></tr></thead>
-    <tbody>
-      <tr><td><code>cluster_machine_type</code></td><td><code>e2-small</code> (2 vCPU shared, 2 GB)</td><td><code>n2-standard-4</code> (4 vCPU, 16 GB)</td></tr>
-      <tr><td><code>cluster_use_spot</code></td><td><code>true</code> (~70% cheaper, preemptible)</td><td><code>false</code> (stable nodes)</td></tr>
-      <tr><td><code>cluster_min_nodes</code></td><td>1</td><td>3 (HA across zones)</td></tr>
-      <tr><td><code>cluster_max_nodes</code></td><td>3</td><td>20</td></tr>
-      <tr><td>Cluster type</td><td>Zonal (cheaper control plane)</td><td>Regional (HA control plane)</td></tr>
-      <tr><td>HCP TF workspace</td><td><code>prodx-dev</code></td><td><code>prodx-prod</code> (separate state)</td></tr>
-      <tr><td>Cloudflare hostnames</td><td><code>prodx.pbcv.dev</code> etc.</td><td><code>app.pbcv.dev</code> / <code>api.pbcv.dev</code> on a separate tunnel</td></tr>
-      <tr><td>Postgres password</td><td>plaintext in values.yaml</td><td>out-of-band Secret, SOPS-encrypted manifest, or External Secrets Operator pulling from a managed secret store</td></tr>
-      <tr><td>Image tags Argo deploys</td><td><code>:latest</code> + <code>pullPolicy: Always</code></td><td>pinned <code>:v1.2.3</code> tags; bumped by promotion PR</td></tr>
-      <tr><td>Approval to apply</td><td>any time, from your laptop</td><td>VCS-driven Remote in HCP, PR review required</td></tr>
-    </tbody>
-  </table>
-
-  <p>Adding a prod env is roughly:</p>
-  <ol>
-    <li><code>cp -r envs/dev envs/prod</code></li>
-    <li>Edit <code>envs/prod/versions.tf</code> → workspace <code>prodx-prod</code></li>
-    <li>Edit <code>envs/prod/terraform.tfvars</code> → the overrides above</li>
-    <li>Create the <code>prodx-prod</code> workspace in HCP Terraform (Local exec, or Remote with a service-account credential for VCS-driven applies)</li>
-    <li>Create a second Cloudflare tunnel for prod hostnames; paste its token into <code>envs/prod/terraform.tfvars</code></li>
-    <li>Run the same three-stage apply you did for dev</li>
-  </ol>
-
-  <p>The bootstrap env stays unchanged — both dev and prod live in the <em>same</em> GCP project. If you wanted full GCP-level isolation (prod in its own project), you'd duplicate the bootstrap too: <code>envs/bootstrap-dev</code> + <code>envs/bootstrap-prod</code>, each pointing at a different <code>project_id</code>.</p>
-
-  <div class="callout note">
-    <p>This section is documentation only — no <code>envs/prod/</code> directory exists in the repo today. The intent is to show how the dev-only setup scales without rewrites, not to ship dead code.</p>
-  </div>
-</section>
-
-<section id="verify">
-  <h2><span class="step">12</span>Verify it works</h2>
-
-  <h3>Get cluster credentials and check the pods</h3>
-<pre><code>eval "$(terraform output -raw get_credentials_command)"
-
-kubectl get nodes
-kubectl get pods -A</code></pre>
-
-  <p>You should see:</p>
-  <ul>
-    <li>1 node in <code>Ready</code> state.</li>
-    <li>Argo CD pods in the <code>argocd</code> namespace (<code>argocd-server</code>, <code>argocd-repo-server</code>, <code>argocd-application-controller</code>, …).</li>
-    <li>2 <code>cloudflared</code> pods in the <code>cloudflared</code> namespace.</li>
-  </ul>
-
-  <h3>Confirm the tunnel is connected</h3>
-<pre><code>kubectl -n cloudflared logs deploy/cloudflared --tail=40</code></pre>
-
-  <p>Look for lines like:</p>
-<pre><code>INF Registered tunnel connection connIndex=0 ...
-INF Registered tunnel connection connIndex=1 ...
-INF Registered tunnel connection connIndex=2 ...
-INF Registered tunnel connection connIndex=3 ...</code></pre>
-
-  <p>Four registrations per pod = healthy tunnel. Cloudflare uses four edge connections per cloudflared instance for redundancy.</p>
-
-  <h3>Hit the URLs</h3>
-<pre><code>terraform output public_urls</code></pre>
-
-  <ul>
-    <li><strong><code>https://argocd.pbcv.dev</code></strong> → Argo CD login page.</li>
-    <li><strong><code>https://prodx.pbcv.dev</code></strong> → <em>502 Bad Gateway</em> until ProdXCD is deployed (the service doesn't exist yet).</li>
-    <li><strong><code>https://prodxapi.pbcv.dev</code></strong> → <em>502</em>, same reason.</li>
-  </ul>
-
-  <h3>Log into Argo CD</h3>
-<pre><code>kubectl -n argocd get secret argocd-initial-admin-secret \
-  -o jsonpath='{.data.password}' | base64 -d; echo</code></pre>
-  <p>That prints the bootstrap password. Username is <code>admin</code>. Log in at <code>https://argocd.pbcv.dev</code>. The trailing <code>; echo</code> just appends a newline so the password isn't glued to the next prompt line.</p>
-  <div class="callout note">
-    <p>Earlier versions of this doc used <code>eval "$(terraform output -raw argocd_initial_admin_secret_command)"</code>. That works in a clean bash shell from inside <code>envs/dev</code> after <code>terraform init</code> + a successful apply, but breaks the moment any of those preconditions slip (wrong directory, expired HCP login, fish/zsh quoting). The bare <code>kubectl</code> above only needs a loaded kubeconfig.</p>
-  </div>
-
-  <p>Right after first login, delete the bootstrap secret (good hygiene):</p>
-<pre><code>kubectl -n argocd delete secret argocd-initial-admin-secret</code></pre>
-
-  <div class="callout ok">
-    <p><strong>You now have:</strong> a real GKE cluster, Argo CD waiting for work, two publicly reachable URLs hidden behind Cloudflare's edge with TLS — no LoadBalancers, no cert-manager, no static GCP credentials anywhere on disk.</p>
-  </div>
-</section>
-
-<section id="prodxcd">
-  <h2><span class="step">13</span>ProdXCD + the root Argo Application</h2>
-
-  <p>This is the last piece that closes the loop: a Helm chart in a separate repo (<a href="https://github.com/DemOnJR/ProdXCD"><code>ProdXCD</code></a>) that Argo CD pulls from, plus a one-time <code>Application</code> resource in ProdXTF that registers the chart with Argo. Once both are in place, every push to ProdX → CI builds → pushes to GAR → calls <code>kubectl rollout restart</code> → new pods pull from GAR → live. Argo CD reconciles ProdXCD itself for any Helm chart changes (values, replicas, resource limits).</p>
-
-  <h3>13.0 — Argo CD configuration (set by ProdXTF, not by you)</h3>
-  <p>The <code>argocd</code> module in ProdXTF installs the official <a href="https://github.com/argoproj/argo-helm">argo-cd Helm chart</a> with all defaults, except two intentional overrides — both because we sit Argo CD behind Cloudflare Tunnel:</p>
-
-<pre><code># ProdXTF/modules/argocd/main.tf — values passed to helm_release
-values = [
-  yamlencode({
-    server = {
-      service = {
-        type = "ClusterIP"        # default is LoadBalancer; we don't want a $20/mo GCP LB
-      }                           # because cloudflared reaches argocd-server in-cluster.
-    }
-    configs = {
-      params = {
-        "server.insecure" = "true"  # makes argocd-server speak HTTP on :80 instead of
-      }                             # HTTPS-with-self-signed-cert on :443. TLS is already
-    }                               # terminated at Cloudflare's edge before the request
-  })                                # enters the tunnel, so HTTPS in-cluster would be
-]                                   # double-encryption (and break the CF tunnel ingress
-                                    # rule unless we set originRequest.noTLSVerify).</code></pre>
-
-  <p>Everything else (the controller, repo-server, applicationset-controller, dex, redis, notifications-controller, the CRDs) uses chart defaults. The Helm release is pinned to chart version <code>7.7.7</code> in <code>envs/dev/variables.tf</code> — bump that var if you want to upgrade Argo CD.</p>
-
-  <h4>What you can configure on Argo CD itself after it's up</h4>
-  <ul>
-    <li><strong>Change the admin password</strong> — log in once with the bootstrap password (<code>kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d</code>), top-right "User Info" → Update Password. Then delete the bootstrap secret (<code>kubectl -n argocd delete secret argocd-initial-admin-secret</code>).</li>
-    <li><strong>Add more Applications</strong> — write the manifest into ProdXCD (or another repo) and either commit a new <code>Application</code> there for an existing "root" Application to find (app-of-apps pattern), or add another <code>kubernetes_manifest</code> to <code>envs/dev/argocd_apps.tf</code>.</li>
-    <li><strong>Add repo credentials</strong> for private Git repos — Argo CD settings → Repositories → Connect Repo. Or persist via a <code>Secret</code> labeled <code>argocd.argoproj.io/secret-type: repository</code>.</li>
-    <li><strong>RBAC / SSO</strong> — Argo CD supports OIDC, GitHub, Google, etc. via the chart's <code>configs.cm</code> and <code>configs.rbac</code> values. We don't bother for a single-user dev cluster.</li>
-  </ul>
-
-  <h3>13.1 — The ProdXCD Helm chart</h3>
-  <p>Layout:</p>
-<pre><code>ProdXCD/
-└── charts/
-    └── prodx/
-        ├── Chart.yaml                        name: prodx, version: 0.1.0
-        ├── values.yaml                       image tags, replicas, storage sizes, resource limits
-        └── templates/
-            ├── _helpers.tpl                  common labels
-            ├── secret-postgres.yaml          POSTGRES_USER/PASSWORD/DB + DATABASE_URL
-            ├── postgres-statefulset.yaml     1Gi PVC, standard-rwo, pg_isready probes
-            ├── postgres-service.yaml         headless ClusterIP, port 5432
-            ├── redis-statefulset.yaml        256Mi PVC, --appendonly yes, ping probes
-            ├── redis-service.yaml            headless ClusterIP, port 6379
-            ├── prodx-api-deployment.yaml     europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-api:latest, /health probes
-            ├── prodx-api-service.yaml        ClusterIP, port 8000
-            ├── prodx-web-deployment.yaml     europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-web:latest
-            └── prodx-web-service.yaml        ClusterIP, port 80</code></pre>
-
-  <p>Two design choices worth calling out:</p>
-  <ul>
-    <li><strong><code>imagePullPolicy: Always</code> on both Deployments.</strong> The chart uses floating <code>:latest</code> tags, so on every pod restart GAR is hit for a fresh manifest. Trade-off: more pulls. The CI's final <code>kubectl rollout restart</code> step (added in <code>ci-{backend,frontend}.yml</code>) means a successful push automatically rolls the deployment, no manual <code>kubectl</code> needed.</li>
-    <li><strong>StatefulSets for Postgres + Redis with PVCs.</strong> GKE's default <code>standard-rwo</code> StorageClass provisions a Persistent Disk (<code>pd-standard</code>) per PVC. Data survives pod restarts and node replacements. Roughly $0.04/GB/month for the underlying PDs.</li>
-  </ul>
-
-  <h3>13.2 — The root Argo Application (in ProdXTF)</h3>
-  <p>Argo CD doesn't auto-discover anything. We need one <code>Application</code> resource that says "watch this Git repo, render the chart at this path, sync into this namespace". Terraform creates it via <code>kubernetes_manifest</code> in <code>envs/dev/argocd_apps.tf</code>:</p>
-<pre><code>resource "kubernetes_manifest" "prodx_root_app" {
-  manifest = {
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata   = { name = "prodx", namespace = "argocd",
-                   finalizers = ["resources-finalizer.argocd.argoproj.io"] }
-    spec = {
-      project     = "default"
-      source      = { repoURL = "https://github.com/DemOnJR/ProdXCD.git"
-                      targetRevision = "main", path = "charts/prodx",
-                      helm = { releaseName = "prodx" } }
-      destination = { server = "https://kubernetes.default.svc", namespace = "prodx" }
-      syncPolicy  = {
-        automated   = { prune = true, selfHeal = true }
-        syncOptions = ["CreateNamespace=true", "ServerSideApply=true"]
-        retry       = { limit = 5, backoff = { duration = "5s", factor = 2, maxDuration = "5m" } }
-      }
-    }
-  }
-  depends_on = [module.argocd]
-}</code></pre>
-
-  <p>Apply with <code>terraform apply</code> in <code>envs/dev</code>. Argo CD detects the Application within ~30s and starts the first sync.</p>
-
-  <div class="callout note">
-    <p><strong>Why this resource lives in ProdXTF, not ProdXCD.</strong> The Application is the <em>bootstrap link</em> between the cluster and ProdXCD; it has to come from somewhere outside ProdXCD itself. Putting it in TF keeps the "cluster bootstrap" story end-to-end Terraform-managed. Once it's in place, every future workload can be added by writing a new Argo <code>Application</code> manifest <em>into</em> ProdXCD — no more TF changes needed.</p>
-  </div>
-
-  <h3>13.3 — Verify the loop closed</h3>
-<pre><code># Argo CD's view
-kubectl -n argocd get application prodx
-#   NAME    SYNC STATUS   HEALTH STATUS
-#   prodx   Synced        Healthy
-
-# Cluster state
-kubectl -n prodx get pods,svc,pvc
-#   8 resources: 4 pods (postgres, redis, prodx-api, prodx-web),
-#   4 services, 2 PVCs
-
-# End-to-end smoke test
-curl -s https://prodxapi.pbcv.dev/api/metrics | jq
-#   { "status": "healthy", "dependencies": { "postgres": {...}, "redis": {...} },
-#     "graph_count": 1 }
-
-curl -sI https://prodx.pbcv.dev
-#   HTTP/2 200   (the SPA loads, served via Cloudflare Tunnel + cloudflared + nginx)
-
-curl -s https://prodx.pbcv.dev/api/metrics
-#   Same JSON as prodxapi.pbcv.dev -- proves the in-pod nginx /api/ proxy works
-#   so the SPA can use relative URLs.</code></pre>
-
-  <h3>13.4 — The GitOps loop, demoed</h3>
-  <p>Try this once everything is up:</p>
-  <ol>
-    <li>Edit <code>ProdX/backend/app/seed.py</code> — change one node's label.</li>
-    <li>Create a feature branch, commit, push, open PR. CI runs lint/test/audit/build/scan against the PR (~2 min).</li>
-    <li>Squash-merge the PR. CI on main now publishes to GAR + calls <code>kubectl rollout restart</code> automatically (~3 min).</li>
-    <li>Refresh <a href="https://prodx.pbcv.dev">prodx.pbcv.dev</a> — the new label is live.</li>
-  </ol>
-  <p>You never <code>kubectl apply</code>-ed a manifest. You never touched a cloud console or ran <code>kubectl</code> from your laptop. The change propagated entirely through Git → CI → registry → cluster pull, with CI's WIF-derived identity doing both the push and the rollout.</p>
-</section>
-
-<section id="teardown">
-  <h2><span class="step">14</span>Teardown</h2>
-
-  <h3>Daily / between sessions — keep the project, kill the cluster</h3>
-  <p>To preserve free-trial credit while not actively working:</p>
-<pre><code># Step 1: delete the prodx namespace directly. The cascade-deletes the PVCs,
-# which in turn delete the underlying Persistent Disks (standard-rwo has
-# reclaimPolicy: Delete by default). Without this, the PDs orphan at ~$0.04/GB/month each.
-# (Tip: deleting the Argo Application alone with `kubectl delete application prodx` is NOT
-# reliable -- in practice Argo CD's finalizer doesn't always cascade in time before
-# terraform destroy nukes the helm release, leaving the namespace and PVCs orphaned.)
-kubectl delete namespace prodx --wait=false
-kubectl wait --for=delete namespace/prodx --timeout=180s
-
-# Step 2: terraform destroy the rest of the env
-cd ProdXTF/envs/dev
-terraform destroy</code></pre>
-
-  <p>This removes the cloudflared deployment, the Argo CD release, the GKE cluster, and the VPC — about 4 minutes. State stays in HCP Terraform so the next <code>apply</code> rebuilds everything from the same config. The GCP project stays; the project alone costs $0/month.</p>
-
-  <p>Verify no orphan PDs:</p>
-<pre><code>gcloud compute disks list --project prodx-dev --filter='name!~"^gke-"'
-# Should print "Listed 0 items." -- only node boot disks (gke-*) survive and they
-# go away with the cluster.</code></pre>
-
-  <div class="callout warn">
-    <p><strong>About the kubectl delete step:</strong> if you skip it and go straight to <code>terraform destroy</code>, the cluster's PVs/PDs <em>may</em> survive cluster deletion and keep billing. The Argo Application's <code>resources-finalizer.argocd.argoproj.io</code> ensures Argo CD removes child resources (PVCs included) when the Application is deleted. <strong>If you forgot:</strong> check <code>gcloud compute disks list --project prodx-dev</code> for orphans and delete them with <code>gcloud compute disks delete &lt;name&gt; --zone europe-west3-a</code>.</p>
-  </div>
-
-  <h3>Full wipe — destroy the project too</h3>
-  <p>Done with the project entirely:</p>
-<pre><code># Dev first (cluster + tunnel)
-cd ProdXTF/envs/dev
-kubectl delete namespace prodx --wait=false &amp;&amp; kubectl wait --for=delete namespace/prodx --timeout=180s
-terraform destroy -auto-approve
-
-# Then bootstrap (soft-deletes the project)
-cd ../bootstrap
-terraform destroy -auto-approve</code></pre>
-
-  <div class="callout danger">
-    <p><strong>30-day project ID reservation.</strong> When the bootstrap destroy soft-deletes the project, GCP keeps the project ID reserved for 30 days (so the deletion can be reversed via <code>gcloud projects undelete &lt;id&gt;</code>). During those 30 days <em>you cannot create a new project with the same ID</em>. To re-apply bootstrap during the reservation window, edit <code>envs/bootstrap/terraform.tfvars</code> with a different <code>project_id</code> (e.g. append a suffix: <code>project_id = "prodx-dev2"</code>) and remember to update <code>envs/dev/terraform.tfvars</code> to match before applying dev.</p>
-    <p>Verified the hard way — this document was rebuilt against <code>prodx-dev2</code> after a clean destroy+replay of bootstrap.</p>
-  </div>
-
-  <div class="callout note">
-    <p>After destroying bootstrap, your ADC's <code>quota_project_id</code> still points at the now-soft-deleted project. Future TF runs will fail with "project not found". Clear it before re-applying:</p>
-<pre><code>python3 -c 'import json,os; p=os.path.expanduser("~/.config/gcloud/application_default_credentials.json"); d=json.load(open(p)); d.pop("quota_project_id", None); json.dump(d, open(p,"w"))'
-# or with jq:
-# jq 'del(.quota_project_id)' ~/.config/gcloud/application_default_credentials.json &gt; /tmp/adc.json &amp;&amp; mv /tmp/adc.json ~/.config/gcloud/application_default_credentials.json</code></pre>
-    <p>Then after the new bootstrap apply succeeds, re-pin: <code>gcloud auth application-default set-quota-project &lt;new-project-id&gt;</code>.</p>
-  </div>
-
-  <div class="callout warn">
-    <p><strong>Things <code>terraform destroy</code> does NOT clean up:</strong></p>
-    <ul>
-      <li>Container images in Artifact Registry — deleted with the GCP project itself when you eventually do <code>terraform destroy</code> on <code>envs/bootstrap</code>.</li>
-      <li>Your HCP Terraform workspaces (delete in each workspace's Settings → Destruction and Deletion).</li>
-      <li>The Cloudflare zone (it's your domain — leave it).</li>
-    </ul>
-  </div>
-</section>
-
-<section id="commands">
-  <h2><span class="step">15</span>Reproducing this with your own accounts</h2>
-
-  <p>Everything in this project is designed to be re-runnable by anyone with their own GCP, Cloudflare, and HCP Terraform accounts. This section is the fast path: every shell command in execution order, no narrative. ~25 minutes of active work + ~15 minutes of waiting for GKE. <strong>No registry secret to create</strong> — Workload Identity Federation handles CI auth.</p>
-
-  <div class="callout warn">
-    <p><strong>Values you'll need to substitute</strong> — the commands and config files use my values as concrete examples. Replace them with your own:</p>
-    <table style="margin: 8px 0 0">
-      <thead><tr><th>Placeholder</th><th>Example (mine)</th><th>What it is</th></tr></thead>
-      <tbody>
-        <tr><td><code>&lt;YOUR-GH-USER&gt;</code></td><td><code>DemOnJR</code></td><td>GitHub account/org owning the three repos. Drives the <code>github_repo_owner</code> tfvar that gates WIF.</td></tr>
-        <tr><td><code>&lt;YOUR-DOMAIN&gt;</code></td><td><code>pbcv.dev</code></td><td>Cloudflare-managed zone; appears in <code>cors_origins</code> in <code>ProdXCD/charts/prodx/values.yaml</code> and as the parent of the three subdomains</td></tr>
-        <tr><td><code>&lt;YOUR-TFC-ORG&gt;</code></td><td><code>PBDaemon</code></td><td>HCP Terraform organization name; appears in both <code>versions.tf</code> files</td></tr>
-        <tr><td><code>&lt;YOUR-BILLING&gt;</code></td><td><code>0146A8-513D23-B9E74D</code></td><td>GCP billing account ID; appears in <code>envs/bootstrap/terraform.tfvars</code></td></tr>
-        <tr><td><code>&lt;YOUR-PROJECT-ID&gt;</code></td><td><code>prodx-dev2</code></td><td>GCP project ID that bootstrap creates (must be globally unique). The Artifact Registry URL bakes this in: <code>europe-west3-docker.pkg.dev/&lt;project&gt;/prodx/prodx-{api,web}</code></td></tr>
-      </tbody>
+  </li>
+  <li>Click <b>Continue</b> → <b>Create Token</b>, then <b>copy the token</b>.</li>
+</ol>
+<div class="note warn">
+  <span class="lbl">Copy it now</span>
+  Cloudflare shows the token's value <b>only once</b>. If you lose it, you must create a new one.
+</div>
+
+<h3>How to create the GitHub access token (PAT)</h3>
+<ol class="clean">
+  <li>Go to <a href="https://github.com/settings/tokens?type=beta">github.com/settings/tokens?type=beta</a>
+      → <b>Generate new token</b> (fine-grained).</li>
+  <li><b>Resource owner</b>: your account. <b>Repository access</b>: <i>Only select repositories</i> →
+      pick <code>ProdX</code>, <code>ProdXTF</code>, <code>ProdXCD</code>.</li>
+  <li>Set these <b>Repository permissions</b>:
+    <table>
+      <tr><th>Permission</th><th>Access</th><th>Why</th></tr>
+      <tr><td>Administration</td><td>Read and write</td><td>Branch protection rules</td></tr>
+      <tr><td>Actions</td><td>Read and write</td><td>CI workflow settings</td></tr>
+      <tr><td>Variables</td><td>Read and write</td><td>So Terraform can publish the deploy settings</td></tr>
+      <tr><td>Secrets</td><td>Read and write</td><td>Only if you use the optional Cursor review</td></tr>
+      <tr><td>Contents</td><td>Read-only</td><td>Reading the repos</td></tr>
+      <tr><td>Metadata</td><td>Read-only</td><td>Granted automatically</td></tr>
     </table>
-  </div>
+  </li>
+  <li>Click <b>Generate token</b> and copy it.</li>
+</ol>
 
-  <h3>15.1 — Install the CLIs (one-time per machine, Ubuntu 22.04 / 24.04)</h3>
+<!-- ============================================================= -->
+<h2 id="orgname">7 · One config edit</h2>
 
-  <p>One paste-and-run block that installs Git, jq, curl, Docker Engine, gcloud, Terraform, and kubectl using official apt repos:</p>
-<pre><code>set -euo pipefail
+<p>Two files have the HCP Terraform organization name written inside them. This is the only
+hand-edit you can't avoid (Terraform doesn't allow this particular setting to be a variable).</p>
 
-# 1. Base utilities + Docker Engine
-sudo apt update
-sudo apt install -y git curl jq ca-certificates gnupg lsb-release apt-transport-https
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker "$USER"     # log out + back in after this for `docker` without sudo
+<p>In your <b>ProdXTF</b> folder, open these two files and change the
+<code>organization</code> line to <b>your</b> HCP org name:</p>
+<ul class="clean">
+  <li><code>envs/bootstrap/versions.tf</code></li>
+  <li><code>envs/dev/versions.tf</code></li>
+</ul>
 
-# 2. gcloud CLI (Google Cloud apt repo)
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-  | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
-  | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+<div class="code">
+<button class="copy">Copy</button>
+<pre>  cloud {
+    organization = "YOUR-HCP-ORG"     <span class="c"># &lt;-- change this line in BOTH files</span>
+    workspaces { name = "..." }
+  }</pre>
+</div>
 
-# 3. Terraform (HashiCorp apt repo)
-wget -qO- https://apt.releases.hashicorp.com/gpg \
-  | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
-  | sudo tee /etc/apt/sources.list.d/hashicorp.list
+<!-- ============================================================= -->
+<h2 id="build">8 · Run the environments</h2>
 
-# 4. kubectl (Kubernetes pkgs.k8s.io apt repo)
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key \
-  | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' \
-  | sudo tee /etc/apt/sources.list.d/kubernetes.list
+<p>Now you build everything. ProdXTF is organized into five <b>environments</b> — each is just
+a folder you go into and run a couple of commands. <b>Run them in this exact order:</b></p>
 
-# 5. Install everything from the new repos
-sudo apt update
-sudo apt install -y google-cloud-cli terraform kubectl
+<table>
+  <tr><th>#</th><th>Folder</th><th>What it builds</th><th>Time</th></tr>
+  <tr><td>1</td><td><code>envs/tfc-bootstrap</code></td><td>The online "save slots" for Terraform's state</td><td>~10 s</td></tr>
+  <tr><td>2</td><td><code>envs/bootstrap</code></td><td>The Google Cloud project</td><td>~3 min</td></tr>
+  <tr><td>3</td><td><code>envs/dev</code></td><td>The cluster + Argo CD + registry (the big one)</td><td>~22 min</td></tr>
+  <tr><td>4</td><td><code>envs/vault-bootstrap</code></td><td>Connects the cluster to Vault, stores the passwords</td><td>~1 min</td></tr>
+  <tr><td>5</td><td><code>envs/github-bootstrap</code></td><td>Locks down the GitHub repos (branch protection)</td><td>~10 s</td></tr>
+</table>
 
-# 6. Sanity check
-docker --version
-gcloud --version | head -1
-terraform version | head -1
-kubectl version --client | head -1
-jq --version</code></pre>
+<p>Each environment has a file called <code>terraform.tfvars.example</code>. The pattern is
+always the same: <b>copy it</b> to <code>terraform.tfvars</code>, <b>fill in your values</b>,
+then <b>apply</b>. Your real <code>terraform.tfvars</code> files are kept private (they're
+git-ignored) so your keys never end up on GitHub.</p>
 
-  <div class="callout note">
-    <p><strong>Headless server?</strong> The <code>gcloud auth login</code> and <code>terraform login</code> commands in later steps want to open a browser. On a headless box, run them with <code>--no-browser</code> (gcloud) or follow the printed URL manually (terraform); both then accept a code you paste back.</p>
-  </div>
+<div class="note info">
+  <span class="lbl">What "terraform apply" does</span>
+  <code>terraform init</code> gets things ready. <code>terraform apply</code> shows a plan and
+  asks you to confirm — type <code>yes</code> and press <span class="kbd">Enter</span>.
+  Terraform then builds the cloud resources for you.
+</div>
 
-  <h3>15.2 — Clone the three repos</h3>
-<pre><code>mkdir -p prodx-workspace &amp;&amp; cd prodx-workspace
-git clone https://github.com/DemOnJR/ProdX.git
-git clone https://github.com/DemOnJR/ProdXTF.git
-git clone https://github.com/DemOnJR/ProdXCD.git</code></pre>
-
-  <h3>15.3 — Run ProdX locally (verify the app works before touching cloud)</h3>
-<pre><code>cd ProdX
-docker compose up --build           # ~3 min first time
-# open http://localhost:8080
-docker compose down                 # stops; data persists in pg_data volume
-cd ..</code></pre>
-
-  <h3>15.4 — GitHub CI secrets</h3>
-  <p>None. CI authenticates to GCP via Workload Identity Federation; the trust binding is provisioned by ProdXTF (<code>modules/registry</code>) and gates on your GitHub repo's <code>owner/name</code>. The only manual step is setting <code>github_repo_owner</code> in <code>ProdXTF/envs/dev/terraform.tfvars</code> (covered in 15.8).</p>
-
-  <h3>15.5 — Google Cloud (gcloud + free trial)</h3>
-<pre><code>gcloud auth login                              # browser flow
-gcloud auth application-default login          # browser flow, separate creds for TF
-gcloud billing accounts list                   # → save the ACCOUNT_ID (the OPEN one)</code></pre>
-
-  <h3>15.6 — HCP Terraform (browser + CLI)</h3>
-  <ol>
-    <li>Sign up at <a href="https://app.terraform.io">app.terraform.io</a>; create an org (note the name).</li>
-    <li>Create two workspaces, both <strong>CLI-driven</strong>: <code>prodx-bootstrap</code> and <code>prodx-dev</code>.</li>
-    <li>For <em>each</em> workspace: Settings → General → Execution Mode → <strong>Local</strong> → Save settings.</li>
-    <li>Edit both <code>ProdXTF/envs/bootstrap/versions.tf</code> and <code>ProdXTF/envs/dev/versions.tf</code> — replace <code>REPLACE_ME_TFC_ORG</code> with your org name.</li>
-  </ol>
-<pre><code>terraform login                                # browser flow, writes ~/.terraform.d/credentials.tfrc.json</code></pre>
-
-  <h3>15.7 — Cloudflare tunnel (browser)</h3>
-  <ol>
-    <li><a href="https://one.dash.cloudflare.com">one.dash.cloudflare.com</a> → Networks → Tunnels → Create a tunnel → Cloudflared → name it <code>prodx-dev</code>.</li>
-    <li>Copy the JWT after <code>--token</code> in the displayed <code>docker run</code> command. Save it.</li>
-    <li>Public Hostnames tab → add three:
-      <ul>
-        <li><code>argocd.pbcv.dev</code> → HTTP → <code>argocd-server.argocd.svc.cluster.local:80</code></li>
-        <li><code>prodx.pbcv.dev</code> → HTTP → <code>prodx-web.prodx.svc.cluster.local:80</code></li>
-        <li><code>prodxapi.pbcv.dev</code> → HTTP → <code>prodx-api.prodx.svc.cluster.local:8000</code></li>
-      </ul>
-    </li>
-  </ol>
-
-  <h3>15.8 — Bootstrap apply (creates the GCP project)</h3>
-<pre><code>cd ProdXTF/envs/bootstrap
+<h3>8.1 — tfc-bootstrap</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>cd ProdXTF/envs/tfc-bootstrap
 cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars: set billing_account from step 15.5
-
-# If gcloud ADC has a stale quota_project_id from a previous project, clear it:
-[ "$(grep -c quota_project_id ~/.config/gcloud/application_default_credentials.json)" = "1" ] &amp;&amp; \
-  jq 'del(.quota_project_id)' ~/.config/gcloud/application_default_credentials.json &gt; /tmp/adc.json &amp;&amp; \
-  mv /tmp/adc.json ~/.config/gcloud/application_default_credentials.json
-
+<span class="c"># edit terraform.tfvars:  organization = "YOUR-HCP-ORG"</span>
 terraform init
-terraform apply                                # ~3 min; creates prodx-dev project + 5 APIs
+terraform apply</pre>
+</div>
 
-# Pin gcloud to the new project
-gcloud config set project $(terraform output -raw project_id)
-gcloud auth application-default set-quota-project $(terraform output -raw project_id)</code></pre>
-
-  <h3>15.9 — Dev apply (creates GKE + Argo CD + cloudflared + root Argo App)</h3>
-
-  <p>Three stages on a fresh state, all verified by a full <code>terraform destroy</code> + replay. Run them in order:</p>
-<pre><code>cd ../dev
+<h3>8.2 — bootstrap (the Google Cloud project)</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>cd ../bootstrap
 cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars:
-#   project_id               = "prodx-dev"
-#   cloudflared_tunnel_token = "&lt;the JWT from step 15.7&gt;"
+<span class="c"># edit terraform.tfvars:</span>
+<span class="c">#   billing_account = "01ABCD-234567-89EFGH"</span>
+<span class="c">#   project_id      = "YOUR-PROJECT-ID"</span>
+terraform init
+terraform apply</pre>
+</div>
+<p>After it finishes, tell <code>gcloud</code> to use this new project by default:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>gcloud config set project $(terraform output -raw project_id)
+gcloud auth application-default set-quota-project $(terraform output -raw project_id)</pre>
+</div>
 
-terraform init                                                              # ~30s
+<h3>8.3 — dev (the cluster and everything on it)</h3>
+<p>This is the big one. Fill in the file first:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>cd ../dev
+cp terraform.tfvars.example terraform.tfvars</pre>
+</div>
+<p>Edit <code>terraform.tfvars</code> and set:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>project_id            = "YOUR-PROJECT-ID"        <span class="c"># same as step 8.2</span>
+cloudflare_api_token  = "YOUR-CLOUDFLARE-TOKEN"
+cloudflare_account_id = "YOUR-CLOUDFLARE-ACCOUNT-ID"
+cloudflare_zone_id    = "YOUR-CLOUDFLARE-ZONE-ID"
+cloudflare_domain     = "YOUR-DOMAIN"            <span class="c"># e.g. example.com</span>
+github_repo_owner     = "YOUR-GITHUB-USERNAME"
+github_token          = "YOUR-GITHUB-PAT"        <span class="c"># the token from step 6</span></pre>
+</div>
+<p>Then build it. The <b>first</b> build runs in three stages (the cluster has to exist before
+the tools that talk to it can be set up):</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>terraform init
 
-# --- One-liner: all three stages, hands-off (~22 min) ---
-terraform apply -target=module.network -target=module.cluster -auto-approve \
-  &amp;&amp; terraform apply -target=module.argocd -target=module.cloudflared -auto-approve \
-  &amp;&amp; terraform apply -auto-approve
+<span class="c"># Stage 1 — network, cluster, image registry  (~14 min)</span>
+terraform apply -target=module.network -target=module.cluster -target=module.registry -auto-approve
 
-# --- Or run the stages individually if you want to inspect between them ---
-# Stage 1: VPC + GKE cluster + node pool
-terraform apply -target=module.network -target=module.cluster -auto-approve # ~14 min
+<span class="c"># Stage 2 — Argo CD + the Cloudflare connector  (~5-7 min)</span>
+terraform apply -target=module.argocd -target=module.cloudflared -auto-approve
 
-# Stage 2a: Argo CD Helm release (installs argoproj.io CRDs) + cloudflared
-terraform apply -target=module.argocd -target=module.cloudflared -auto-approve  # ~8 min
+<span class="c"># Stage 3 — the rest  (~1 min)</span>
+terraform apply -auto-approve</pre>
+</div>
+<div class="note tip">
+  <span class="lbl">Only the first time</span>
+  The three stages are needed <b>only on the very first build</b> (or after a full destroy).
+  Normal updates later are just a single <code>terraform apply</code>.
+</div>
 
-# Stage 2b: the root Argo CD Application that points at ProdXCD
-terraform apply -auto-approve                                               # ~1s</code></pre>
+<h3>8.4 — vault-bootstrap (passwords for the app)</h3>
+<p>This connects the cluster to Vault and stores the app's passwords there.
+Make sure you ran <code>vault login</code> (Step 5) first.</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>cd ../vault-bootstrap
+cp terraform.tfvars.example terraform.tfvars
+<span class="c"># edit terraform.tfvars:</span>
+<span class="c">#   project_id            = "YOUR-PROJECT-ID"</span>
+<span class="c">#   cluster_name          = "prodx-dev-gke"   (leave as-is)</span>
+<span class="c">#   postgres_password     = "YOUR-DB-PASSWORD"</span>
+<span class="c">#   cloudflare_api_token  = "YOUR-CLOUDFLARE-TOKEN"</span>
+<span class="c">#   cloudflare_account_id = "YOUR-CLOUDFLARE-ACCOUNT-ID"</span>
+<span class="c">#   cloudflare_zone_id    = "YOUR-CLOUDFLARE-ZONE-ID"</span>
+terraform init
+terraform apply</pre>
+</div>
 
-  <div class="callout warn">
-    <p><strong>Why three stages, not two:</strong> the original "two-stage" advice was incomplete. The <code>kubernetes_manifest</code> for the root Argo Application validates its CRD at <em>plan time</em>, but the CRD is installed by the helm release in the same configuration. Without the 2a step, plan errors with <em>"no matches for kind Application in group argoproj.io"</em>. The split between 2a and 2b is purely a bootstrap concern — subsequent <code>terraform apply</code>s are a single bare command.</p>
-  </div>
+<h3>8.5 — github-bootstrap (lock down the repos)</h3>
+<p>This adds branch-protection rules to your three GitHub forks. Do it <b>after</b> the app's
+CI has run at least once (see 8.6) so the required check already exists.</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>cd ../github-bootstrap
+cp terraform.tfvars.example terraform.tfvars
+<span class="c"># edit terraform.tfvars:</span>
+<span class="c">#   github_owner = "YOUR-GITHUB-USERNAME"</span>
+<span class="c">#   github_token = "YOUR-GITHUB-PAT"</span>
+terraform init
+terraform apply</pre>
+</div>
 
-  <h3>15.10 — Load kubeconfig + verify cluster</h3>
-<pre><code>$(terraform output -raw get_credentials_command)
+<h3>8.6 — Ship the app</h3>
+<p>The infrastructure is up, but the app images still need to be built and pushed.
+The CI pipeline does this automatically. Trigger it by making any small change on the
+<code>main</code> branch of your <b>ProdX</b> fork:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>cd ProdX
+git commit --allow-empty -m "ci: trigger first build"
+git push origin main</pre>
+</div>
+<p>Watch it run in your ProdX repo on GitHub → <b>Actions</b> tab. When it finishes, it has
+built the website and API images and shipped them to the cluster. Argo CD then deploys them.</p>
+
+<div class="note info">
+  <span class="lbl">How the pieces find each other</span>
+  When <code>envs/dev</code> was applied it automatically published the deploy settings
+  (project, registry, cluster) to your ProdX repo as <b>GitHub Actions variables</b>.
+  The CI pipeline reads those — so you never edit the workflow files by hand, even after a
+  rebuild.
+</div>
+
+<!-- ============================================================= -->
+<h2 id="verify">9 · Check it works</h2>
+
+<p>From the <code>envs/dev</code> folder:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre><span class="c"># Connect kubectl to your new cluster</span>
+$(terraform output -raw get_credentials_command)
+
+<span class="c"># The cluster's machines — expect 1-2 lines saying "Ready"</span>
 kubectl get nodes
-kubectl get pods -A
 
-# Tunnel connection check (4 "Registered tunnel connection" lines per pod = good)
-kubectl -n cloudflared logs deploy/cloudflared --tail=20 | grep Registered</code></pre>
-
-  <h3>15.11 — Wait for Argo CD to sync ProdXCD</h3>
-  <p>The root Application from 15.9 stage 2b tells Argo CD to watch ProdXCD. Argo polls every ~3 min, or trigger it immediately:</p>
-<pre><code>kubectl -n argocd annotate application prodx argocd.argoproj.io/refresh=normal --overwrite
-
-# Watch sync + workload creation (~3-5 min until all 4 pods are Running)
-kubectl -n argocd get application prodx -w   # Ctrl-C when Synced / Healthy
-
-# Confirm
+<span class="c"># The app's parts — wait until all show "Running"</span>
 kubectl -n prodx get pods
-# NAME                          READY   STATUS    RESTARTS   AGE
-# postgres-0                    1/1     Running   0          ...
-# prodx-api-xxxxxxxxxx-xxxxx    1/1     Running   1-2        ...   ← restarts while postgres warms up
-# prodx-web-xxxxxxxxxx-xxxxx    1/1     Running   0          ...
-# redis-0                       1/1     Running   0          ...</code></pre>
 
-  <p>If you need to manually re-apply it (e.g. you deleted it via <code>kubectl</code>):</p>
-<pre><code>terraform apply -target=kubernetes_manifest.prodx_root_app</code></pre>
+<span class="c"># Argo CD's view of the app — expect "Synced" / "Healthy"</span>
+kubectl -n argocd get application prodx</pre>
+</div>
 
-  <h3>15.12 — Argo CD admin password + UI</h3>
-<pre><code># Bare kubectl: needs only a loaded kubeconfig. Works from any directory.
-kubectl -n argocd get secret argocd-initial-admin-secret \
-  -o jsonpath='{.data.password}' | base64 -d; echo
-# prints the password; user is `admin`. Open https://argocd.pbcv.dev
+<p>Then open these in your browser (using your domain):</p>
+<ul class="clean">
+  <li><code>https://prodx.YOUR-DOMAIN</code> — the website</li>
+  <li><code>https://prodxapi.YOUR-DOMAIN/api/metrics</code> — the API (returns some JSON)</li>
+  <li><code>https://argocd.YOUR-DOMAIN</code> — the Argo CD dashboard</li>
+</ul>
 
-# After logging in once, delete the bootstrap secret
-kubectl -n argocd delete secret argocd-initial-admin-secret</code></pre>
+<div class="note tip">
+  <span class="lbl">Give it a minute</span>
+  Right after the first build the app pages may show an error for a minute or two while the
+  images download and the pods start. Refresh. If it's still broken after ~5 minutes, see
+  <a href="#trouble">Troubleshooting</a>.
+</div>
 
-  <h3>15.13 — Manually trigger a sync (or wait ~3 min for auto-poll)</h3>
-<pre><code># Soft refresh (re-reads ProdXCD from Git)
-kubectl -n argocd annotate application prodx argocd.argoproj.io/refresh=normal --overwrite
+<!-- ============================================================= -->
+<h2 id="argocd">10 · Open Argo CD</h2>
 
-# Force sync now
-kubectl -n argocd patch app prodx --type merge \
-  -p '{"operation":{"initiatedBy":{"username":"manual"},"sync":{"revision":"HEAD","prune":true}}}'
+<p>Argo CD is the dashboard that shows what's deployed. There are two ways in.</p>
 
-# Watch sync status
-kubectl -n argocd get application prodx -w</code></pre>
+<h3>Option A — the public address</h3>
+<p>Just open <code>https://argocd.YOUR-DOMAIN</code> in your browser.</p>
 
-  <h3>15.14 — Smoke test all three public URLs</h3>
-<pre><code>curl -sI https://argocd.pbcv.dev | head -3       # Argo CD login page, HTTP/2 200
-curl -s  https://prodxapi.pbcv.dev/api/metrics   # JSON: postgres/redis health
-curl -s  https://prodx.pbcv.dev/api/metrics      # same JSON, via in-pod nginx proxy
-curl -s  https://prodxapi.pbcv.dev/api/graphs/prodx | jq '.nodes | length'   # 12</code></pre>
+<h3>Option B — a private tunnel from your computer</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>kubectl -n argocd port-forward svc/argocd-server 8443:443</pre>
+</div>
+<p>Leave that running, then open <code>https://localhost:8443</code>.</p>
 
-  <h3>15.15 — Ship a code change end-to-end (the actual GitOps demo)</h3>
-<pre><code># In ProdX:
-$EDITOR backend/app/seed.py                      # change a node label
-git commit -am "tweak label" &amp;&amp; git push        # CI builds &amp; pushes :latest
+<h3>Getting the password</h3>
+<p>The username is <b><code>admin</code></b>. Get the first-time password with:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d</pre>
+</div>
+<p>On Windows PowerShell, run this instead:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>$p = kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"
+[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($p))</pre>
+</div>
 
-# Wait ~2 min for CI; then force the new image into the cluster:
-kubectl -n prodx rollout restart deployment/prodx-api
-kubectl -n prodx rollout status deployment/prodx-api
-
-# Refresh https://prodx.pbcv.dev — your edit is live.</code></pre>
-
-  <h3>15.16 — Tear it all down (preserve trial credit)</h3>
-<pre><code># Daily: kill the cluster, keep the project (~4 min terraform destroy)
-kubectl delete namespace prodx --wait=false                # cascades to PVCs → PDs
-kubectl wait --for=delete namespace/prodx --timeout=180s
-cd ProdXTF/envs/dev &amp;&amp; terraform destroy -auto-approve
-
-# Verify no orphan PDs (should print 'Listed 0 items.')
-gcloud compute disks list --project &lt;your-project-id&gt; --filter='name!~"^gke-"'
-
-# Full wipe (project too) — see warning below about ID reservation
-cd ../bootstrap &amp;&amp; terraform destroy -auto-approve
-
-# After bootstrap destroy, clear stale ADC quota_project_id so future TF
-# runs against a different project don't hit "project not found":
-python3 -c 'import json,os; p=os.path.expanduser("~/.config/gcloud/application_default_credentials.json"); d=json.load(open(p)); d.pop("quota_project_id", None); json.dump(d, open(p,"w"))'</code></pre>
-
-  <div class="callout danger">
-    <p><strong>30-day project ID reservation.</strong> After bootstrap destroy, the project enters <code>DELETE_REQUESTED</code> state and its ID is reserved for 30 days. You cannot create a new project with the same ID until the reservation expires (or you successfully <code>gcloud projects undelete &lt;id&gt;</code>). To re-apply bootstrap before then, change <code>project_id</code> in <code>envs/bootstrap/terraform.tfvars</code> to a different value (e.g. add a suffix: <code>prodx-dev2</code>) AND update <code>envs/dev/terraform.tfvars</code> to match before re-applying dev. Verified the hard way — this entire document was rebuilt against <code>prodx-dev2</code> after a clean bootstrap destroy+replay.</p>
+<div class="note warn">
+  <span class="lbl">Change the password, then delete the secret</span>
+  After your first login: in the Argo CD UI, top-right user icon → <b>Update Password</b>.
+  Then delete the original so it can't be recovered:
+  <div class="code" style="margin-top:.5rem;">
+  <button class="copy">Copy</button>
+  <pre>kubectl -n argocd delete secret argocd-initial-admin-secret</pre>
   </div>
+</div>
 
-  <div class="callout note">
-    <p>Every command above is the same one you'd find scattered through sections 5–14 — this section just consolidates them in execution order with no narrative. Use it as a sanity check when you're stuck on whether you missed a step.</p>
-  </div>
-</section>
+<h3>Reading a password out of Vault</h3>
+<p>The app's database password lives in Vault. The cluster fetches it automatically, but you
+can look it up yourself any time:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>vault kv get secret/prodx/postgres</pre>
+</div>
+<p>To change it later: <code>vault kv put secret/prodx/postgres password=NEW-VALUE</code> —
+the cluster picks up the change within an hour.</p>
 
-<section id="troubleshooting">
-  <h2><span class="step">16</span>Troubleshooting</h2>
+<!-- ============================================================= -->
+<h2 id="pause">11 · Pause &amp; resume (save money)</h2>
 
-  <h3>HCP Terraform plan errors with "could not find default credentials"</h3>
-  <p>The workspace is still on Remote execution mode. HCP's runners don't have your local <code>gcloud</code> ADC, so calls error out. Open the workspace → Settings → General → Execution Mode → <strong>Local</strong> → Save settings, then re-run <code>terraform plan</code>. New workspaces default to Remote even when created as CLI-driven.</p>
+<p>The cluster is the only part that costs real money. When you're not using the project,
+<b>pause it</b> — this deletes the cluster but keeps your Google Cloud project, so you can
+rebuild quickly later.</p>
 
-  <h3>Bootstrap apply fails: every API call says "project not found"</h3>
-  <p>Your ADC's <code>quota_project_id</code> is pinned to a deleted project. Check with <code>grep -c quota_project_id ~/.config/gcloud/application_default_credentials.json</code> — if it prints <code>1</code>, clear the field (see step 10 pre-flight). New gcloud versions auto-pin quota project to whatever was active during <code>application-default login</code>; if that project later got deleted, every TF call breaks.</p>
+<h3>Pause</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>cd ProdXTF/envs/dev
+terraform destroy</pre>
+</div>
+<p>Type <code>yes</code>. Takes ~6 minutes. Your bill drops to almost nothing.</p>
 
-  <h3>Bootstrap apply fails: <code>Permission 'resourcemanager.projects.create' denied</code></h3>
-  <p>Your Gmail/Workspace account is associated with a GCP Organization (visible via <code>gcloud organizations list</code>) and that org requires projects to be created under it. Quick test: <code>gcloud projects create test-$(date +%s)</code>. If that also fails, it's an account-level constraint, not a Terraform bug. Options: (a) get <code>roles/resourcemanager.projectCreator</code> on the org, (b) switch to a Gmail account that isn't org-bound, or (c) follow the org-based variant in step 7's appendix.</p>
+<h3>Resume</h3>
+<p>Rebuild with the same three-stage apply as the first time:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>cd ProdXTF/envs/dev
+terraform apply -target=module.network -target=module.cluster -target=module.registry -auto-approve
+terraform apply -target=module.argocd -target=module.cloudflared -auto-approve
+terraform apply -auto-approve</pre>
+</div>
+<p>Then push a commit to ProdX <code>main</code> again (Step 8.6) so the app images are shipped
+to the fresh cluster.</p>
 
-  <h3>Bootstrap apply fails: <code>LifecycleState for parent organizations/... is DELETE_REQUESTED</code></h3>
-  <p>An org you're associated with is being torn down by Google (usually because a Cloud Identity / Workspace subscription was cancelled). Run <code>gcloud organizations describe &lt;ORG_ID&gt;</code> to confirm. There's no quick fix from gcloud — either restore the subscription via <a href="https://admin.google.com">admin.google.com</a> within the grace period, or sign in with a different Gmail account that isn't bound to that dying org and re-run <code>gcloud auth login</code> + <code>gcloud auth application-default login</code>.</p>
+<div class="note tip">
+  <span class="lbl">Rebuilds just work</span>
+  A rebuild lands on new internal addresses, but you don't fix anything by hand:
+  <code>terraform apply</code> re-publishes the deploy settings to GitHub and Argo CD
+  automatically. While the project is paused, CI still passes — it just skips the deploy step.
+</div>
 
-  <h3><code>gcloud config set project</code> warns about a missing "environment" tag</h3>
-  <p>Harmless. Environment tags are org-scoped and parentless projects (which the default no-org bootstrap creates) literally cannot have one bound. There is no action you can take to silence it short of moving to the org-based variant — and it doesn't block anything.</p>
+<!-- ============================================================= -->
+<h2 id="destroy">12 · Destroy everything</h2>
 
-  <h3>CI's WIF auth step fails with <em>"permission denied on attribute condition"</em></h3>
-  <p>GCP rejected the OIDC token because its <code>repository</code> claim doesn't match the value baked into the WIF provider. Check <code>github_repo_owner</code> + <code>github_repo_name</code> in <code>ProdXTF/envs/dev/terraform.tfvars</code> — they must equal exactly the owner/name of the GitHub repo the workflow ran from (case-sensitive). After fixing, <code>terraform apply</code> to update the provider's <code>attribute_condition</code>; no GitHub-side change needed.</p>
+<p>To remove <b>everything</b> — cluster, project, all of it — destroy the environments in the
+<b>reverse</b> order you built them.</p>
 
-  <h3>CI rollout step fails with <em>"gke-gcloud-auth-plugin not found"</em></h3>
-  <p>GKE 1.26+ requires this separate plugin for kubectl auth and it's not on the ubuntu-latest runner by default. The workflow installs it via <code>google-github-actions/setup-gcloud@v3</code> with <code>install_components: gke-gcloud-auth-plugin</code> — make sure that step is present in <code>ci-{backend,frontend}.yml</code> between the GCP auth step and the rollout step.</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre><span class="c"># 1. The cluster and everything on it  (~6 min)</span>
+cd ProdXTF/envs/dev
+terraform destroy
 
-  <h3>CI rollout step fails with HTTP 403 from kubectl</h3>
-  <p>The publisher SA doesn't have cluster access. ProdXTF's <code>modules/registry</code> grants <code>roles/container.developer</code> for exactly this reason — confirm with <code>gcloud projects get-iam-policy &lt;project&gt; --flatten='bindings[].members' --filter='bindings.members:gha-prodx-publisher'</code>. If the role is missing, re-apply ProdXTF.</p>
+<span class="c"># 2. The Vault wiring</span>
+cd ../vault-bootstrap
+terraform destroy
 
-  <h3><code>terraform apply</code> errors on the helm release: "Kubernetes cluster unreachable"</h3>
-  <p>First chicken-and-egg: the <code>helm</code>/<code>kubernetes</code> providers can't reach the cluster until it exists. Do stage 1 of the three-stage first apply (see <a href="#commands">15.9</a>):</p>
-<pre><code>terraform apply -target=module.network -target=module.cluster</code></pre>
+<span class="c"># 3. The GitHub branch-protection rules</span>
+cd ../github-bootstrap
+terraform destroy
 
-  <h3><code>terraform plan</code> errors with <em>"no matches for kind 'Application' in group 'argoproj.io'"</em></h3>
-  <p>Second chicken-and-egg: the <code>kubernetes_manifest.prodx_root_app</code> resource validates the Argo CD CRDs at plan time, but they only get installed by the helm release in the same configuration. Do stage 2a before the bare apply:</p>
-<pre><code>terraform apply -target=module.argocd -target=module.cloudflared
-terraform apply</code></pre>
+<span class="c"># 4. The Google Cloud project itself</span>
+cd ../bootstrap
+terraform destroy
 
-  <h3><code>Error 403: Project ... is not authorized</code> when calling a GCP API</h3>
-  <p>You skipped the <code>gcloud services enable</code> step or your ADC credentials are stale. Re-run:</p>
-<pre><code>gcloud auth application-default login
-gcloud services enable compute.googleapis.com container.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com</code></pre>
+<span class="c"># 5. The HCP Terraform save slots</span>
+cd ../tfc-bootstrap
+terraform destroy</pre>
+</div>
+<p>Type <code>yes</code> at each prompt.</p>
 
-  <h3>Cloudflare API returns <code>Authentication error</code> (code 10000)</h3>
-  <p>Token scopes are missing. Re-issue with the four permissions listed in <a href="#cloudflare">Step 9</a> and the explicit zone include.</p>
+<div class="note danger">
+  <span class="lbl">The 30-day rule — important</span>
+  When you destroy <code>bootstrap</code>, Google deletes the project but <b>reserves its ID
+  for 30 days</b> — you cannot reuse the same <code>project_id</code> during that time.
+  If you rebuild within a month, pick a <b>new</b> project ID (e.g. add a number).
+  This is why pausing with just Step 11 — which keeps the project — is the better
+  "switch off" most of the time.
+</div>
 
-  <h3>Tunnel is created but <code>argocd.pbcv.dev</code> returns "DNS_PROBE_FINISHED_NXDOMAIN"</h3>
-  <p>Cloudflare DNS hasn't propagated yet, or the zone isn't <em>Active</em>. Check <a href="https://dash.cloudflare.com">dash.cloudflare.com</a> — your zone should show "Active" and the DNS tab should list three orange-cloud CNAMEs.</p>
+<!-- ============================================================= -->
+<h2 id="trouble">13 · Troubleshooting</h2>
 
-  <h3>Tunnel returns 502 for <code>prodx.pbcv.dev</code></h3>
-  <p>Expected until ProdXCD deploys the <code>prodx-web</code> Service. The Argo CD route should still work — if all three 502, the tunnel itself is fine but cloudflared can't reach <em>any</em> in-cluster service (check that the cloudflared pods are in the same cluster and the namespace labels are right).</p>
+<h3>The website shows "502" but Argo CD works</h3>
+<p>The cluster is healthy, but the app pods can't start. Almost always this means the app
+images aren't in the registry yet. Fix: run Step 8.6 (push a commit to ProdX <code>main</code>)
+and wait for the CI run to finish.</p>
 
-  <h3>GKE node won't schedule pods, says <code>Insufficient memory</code></h3>
-  <p><code>e2-small</code> has 2 GB total — Argo CD alone uses ~1 GB. If you add ProdX + Postgres + Redis on top, you need a second node or a larger machine. Easy fix: bump <code>cluster_min_nodes = 2</code> in <code>terraform.tfvars</code> and apply, or change <code>cluster_machine_type</code> to <code>e2-medium</code>.</p>
+<h3>A pod is stuck in "ImagePullBackOff"</h3>
+<p>The pod can't download its image. Check what image it's looking for:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>kubectl -n prodx describe pod POD-NAME</pre>
+</div>
+<p>It usually means CI hasn't pushed images yet (run Step 8.6), or the last
+<code>terraform apply</code> in <code>envs/dev</code> didn't finish — re-run it.</p>
 
-  <h3>I want to nuke the state and start over</h3>
-  <p><strong>Don't.</strong> Run <code>terraform destroy</code> first so cloud resources go away, then delete the HCP Terraform workspace. Nuking state without destroying resources leaves orphaned GCP infrastructure that keeps billing.</p>
-</section>
+<h3>The CI pipeline fails at "Auth to GCP"</h3>
+<p>The cluster's deploy settings haven't been published to GitHub. Run
+<code>terraform apply</code> in <code>envs/dev</code>; it writes them as GitHub Actions
+variables. Then re-run the pipeline.</p>
+
+<h3>"Error: Requested entity already exists" while applying</h3>
+<p>Harmless leftover from a recent destroy. Wait a few minutes and run
+<code>terraform apply</code> again — the project now uses unique names so this clears itself.</p>
+
+<h3>terraform apply can't reach the cluster</h3>
+<p>You're doing a first build with a single <code>terraform apply</code>. Use the three-stage
+apply from Step 8.3 instead.</p>
+
+<!-- ============================================================= -->
+<h2 id="glossary">14 · Glossary</h2>
+
+<table>
+  <tr><th>Term</th><th>In plain words</th></tr>
+  <tr><td><b>Terraform</b></td><td>A tool that builds cloud infrastructure from written instructions, so it's repeatable.</td></tr>
+  <tr><td><b>Environment / env</b></td><td>A folder of Terraform code you build separately (this project has five).</td></tr>
+  <tr><td><b>State</b></td><td>Terraform's memory of what it has already built. Stored online in HCP Terraform.</td></tr>
+  <tr><td><b>Kubernetes</b></td><td>Software that runs and manages your app's containers across servers.</td></tr>
+  <tr><td><b>GKE</b></td><td>Google's managed Kubernetes — the cluster this project runs on.</td></tr>
+  <tr><td><b>Cluster</b></td><td>The group of servers Kubernetes manages.</td></tr>
+  <tr><td><b>Pod</b></td><td>The smallest running unit in Kubernetes — basically one running piece of the app.</td></tr>
+  <tr><td><b>Container image</b></td><td>A packaged, ready-to-run copy of a program. CI builds these.</td></tr>
+  <tr><td><b>Artifact Registry</b></td><td>Google's private storage for your container images.</td></tr>
+  <tr><td><b>Helm chart</b></td><td>A template describing what to deploy into the cluster (this is ProdXCD).</td></tr>
+  <tr><td><b>Argo CD</b></td><td>A tool that keeps the cluster matching the Helm chart in Git, automatically.</td></tr>
+  <tr><td><b>GitOps</b></td><td>The idea that Git is the single source of truth for what's deployed.</td></tr>
+  <tr><td><b>CI / CD</b></td><td>Automation that builds, tests and ships your code when you push to GitHub.</td></tr>
+  <tr><td><b>Cloudflare Tunnel</b></td><td>A secure connection that exposes the app on real HTTPS URLs without a public IP.</td></tr>
+  <tr><td><b>Vault</b></td><td>A secure store for passwords and tokens (secrets).</td></tr>
+  <tr><td><b>Workload Identity Federation</b></td><td>A way for GitHub's CI to log in to Google Cloud without a stored password.</td></tr>
+  <tr><td><b>PAT</b></td><td>Personal Access Token — a password-like key that lets tools use your GitHub account.</td></tr>
+</table>
+
+<div class="note info">
+  <span class="lbl">Need more detail?</span>
+  Each repository has its own README with the technical reasoning behind every decision —
+  <b>ProdXTF</b>'s README in particular is a deep dive into the infrastructure.
+</div>
 
 </main>
 </div>
 
 <footer>
-  ProdX — DevOps capstone · <a href="https://github.com/DemOnJR/ProdX">DemOnJR/ProdX</a> · <a href="https://github.com/DemOnJR/ProdXTF">DemOnJR/ProdXTF</a> · <a href="https://github.com/DemOnJR/ProdXCD">DemOnJR/ProdXCD</a>
+  ProdX — Complete Setup Guide · Built for the ProdX DevOps capstone project.
 </footer>
 
 <script>
-// Add a copy button to every <pre><code> block.
-document.querySelectorAll('pre').forEach((pre) => {
-  const btn = document.createElement('button');
-  btn.className = 'copy-btn';
-  btn.type = 'button';
-  btn.textContent = 'copy';
-  btn.addEventListener('click', async () => {
-    const code = pre.querySelector('code')?.innerText ?? pre.innerText;
-    try {
-      await navigator.clipboard.writeText(code);
-      btn.textContent = 'copied';
-      btn.classList.add('copied');
-      setTimeout(() => {
-        btn.textContent = 'copy';
-        btn.classList.remove('copied');
-      }, 1500);
-    } catch {
-      btn.textContent = 'error';
-    }
+  // Copy buttons — copies the command text of the nearest code block.
+  document.querySelectorAll(".code button.copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var pre = btn.parentElement.querySelector("pre");
+      navigator.clipboard.writeText(pre.innerText).then(function () {
+        var old = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(function () { btn.textContent = old; }, 1400);
+      });
+    });
   });
-  pre.appendChild(btn);
-});
-
-// TOC scroll-spy: highlight the link for whichever section is closest to the top.
-const sections = Array.from(document.querySelectorAll('main section[id]'));
-const tocLinks = new Map(
-  Array.from(document.querySelectorAll('aside.toc a[href^="#"]'))
-    .map((a) => [a.getAttribute('href').slice(1), a])
-);
-
-function setActive() {
-  const offset = 80;
-  const y = window.scrollY + offset;
-  let current = sections[0]?.id;
-  for (const s of sections) {
-    if (s.offsetTop <= y) current = s.id;
-    else break;
-  }
-  for (const [id, a] of tocLinks) {
-    a.classList.toggle('active', id === current);
-  }
-}
-
-window.addEventListener('scroll', setActive, { passive: true });
-window.addEventListener('load', setActive);
 </script>
 
 </body>
