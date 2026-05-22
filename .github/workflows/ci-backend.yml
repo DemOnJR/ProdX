@@ -13,6 +13,11 @@ name: CI · Backend
 # Branch protection: job name "🚀 Pipeline" — both ci-backend.yml (real)
 # and ci-backend-skip.yml (stub) use this same job name so exactly one
 # satisfies the required check per PR.
+#
+# workflow_dispatch: lets this pipeline be launched by hand from the
+# Actions tab (or in bulk via the ci-all.yml dispatcher). A manual run
+# is a FULL run — quality checks AND image build AND publish AND deploy
+# — and ignores the path filters below.
 
 on:
   push:
@@ -25,6 +30,9 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/ci-backend.yml'
+
+  # Manual trigger — from the Actions tab or the ci-all.yml dispatcher.
+  workflow_dispatch:
 
 env:
   # GAR repo + WIF wiring (from ProdXTF: `terraform output`).
@@ -46,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write   # for WIF on publish steps (gated to push events)
+      id-token: write   # for WIF on publish steps (push + dispatch only)
     defaults:
       run:
         working-directory: ./backend
@@ -54,14 +62,17 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v6
 
-      # ─── Quality (PR only — main trusts the PR's CI results) ────
+      # ─── Quality (PR + manual dispatch — a main push skips these) ─
       # Branch protection makes the PR's lint/test/audit a hard gate for
-      # the merge button, so re-running them on main is purely defensive
-      # against branch-protection bypass (which the .claude hook + repo
-      # settings already prevent). Skipping saves the setup-python +
-      # `pip install -r requirements-dev.txt` overhead on every main push.
+      # the merge button, so re-running them on a main *push* is purely
+      # defensive against branch-protection bypass (which the .claude
+      # hook + repo settings already prevent). Skipping saves the
+      # setup-python + `pip install` overhead on every main push.
+      #
+      # Gate is `!= 'push'`: true for pull_request AND workflow_dispatch,
+      # so a manual dispatch runs the full quality suite.
       - name: 🐍 Set up Python 3.12
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -69,22 +80,22 @@ jobs:
           cache-dependency-path: backend/requirements-dev.txt
 
       - name: 📦 Install dev dependencies
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: pip install -r requirements-dev.txt
 
       - name: 🔍 Lint  ·  ruff
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: ruff check app/ tests/
 
       - name: 🧪 Test  ·  pytest
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: pytest
 
       - name: 🔐 Audit  ·  pip-audit
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: pip-audit -r requirements.txt
 
-      # ─── Image phase (build + scan; runs on PR AND main) ───────
+      # ─── Image phase (build + scan; runs on every trigger) ─────
       # Single docker build per CI run. Publish (further down) retags
       # the locally-built image and `docker push`es it — no second
       # buildkit invocation. Catches Dockerfile breakages + new CRITICAL
@@ -129,7 +140,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
 
-      # ─── Publish (main push only) ───────────────────────────────
+      # ─── Publish (main push + manual dispatch) ──────────────────
       # Re-uses the image already loaded into local docker by the build
       # step above. `docker tag` is metadata-only (zero seconds), and
       # `docker push` uploads layers directly. No buildkit, no rebuild.

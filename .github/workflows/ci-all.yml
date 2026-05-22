@@ -1,0 +1,55 @@
+name: CI · All
+
+# Manual dispatcher. One "Run workflow" button in the Actions tab that
+# fans out to BOTH service pipelines — ci-backend.yml and
+# ci-frontend.yml — on the branch you pick.
+#
+# Each of those workflows also has its own workflow_dispatch trigger, so
+# you can still run just one service from its own page. This file exists
+# only so you don't have to click twice to run both.
+#
+# How it works: `gh workflow run` calls the workflow-dispatch REST API
+# for each pipeline. workflow_dispatch is one of the two events GitHub
+# still delivers when fired with the built-in GITHUB_TOKEN — the usual
+# "events from GITHUB_TOKEN don't trigger workflows" recursion guard
+# does NOT apply to workflow_dispatch / repository_dispatch — so no PAT
+# is needed, just the `actions: write` permission below.
+#
+# A dispatched run is a FULL run in each pipeline: quality checks +
+# image build + Trivy scan + publish to GAR + GKE rollout. See the
+# header of ci-backend.yml for the per-event behaviour.
+#
+# Note: the two target workflows must already exist on the default
+# branch for `gh workflow run` to find them (a GitHub requirement for
+# workflow_dispatch) — merge this change to main before using it.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    name: 🚀 Trigger backend + frontend pipelines
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write   # `gh workflow run` → workflow-dispatch API
+    steps:
+      - name: 🐍 Dispatch CI · Backend
+        run: gh workflow run ci-backend.yml --ref "$REF" --repo "$REPO"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+
+      - name: ⚛️ Dispatch CI · Frontend
+        run: gh workflow run ci-frontend.yml --ref "$REF" --repo "$REPO"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+
+      - name: 🔗 Summary
+        run: |
+          echo "Dispatched both pipelines on ref \`$REF\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "Watch their progress on the Actions tab." >> "$GITHUB_STEP_SUMMARY"
+        env:
+          REF: ${{ github.ref_name }}

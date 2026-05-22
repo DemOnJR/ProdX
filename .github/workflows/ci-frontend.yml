@@ -2,8 +2,8 @@ name: CI · Frontend
 
 # Single-job pipeline for the React + Vite frontend service.
 # Mirrors ci-backend.yml. See that file for the full rationale on the
-# path-filter + skip-stub design; the companion stub here is
-# ci-frontend-skip.yml.
+# path-filter + skip-stub design and the workflow_dispatch / full-run
+# behaviour; the companion stub here is ci-frontend-skip.yml.
 
 on:
   push:
@@ -16,6 +16,9 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/ci-frontend.yml'
+
+  # Manual trigger — from the Actions tab or the ci-all.yml dispatcher.
+  workflow_dispatch:
 
 env:
   IMAGE: europe-west3-docker.pkg.dev/prodx-dev2/prodx/prodx-web
@@ -42,14 +45,15 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v6
 
-      # ─── Quality (PR only — main trusts the PR's CI results) ────
-      # See ci-backend.yml for rationale. Note: the Docker image build
-      # step below performs its own vite build inside the Dockerfile,
-      # so even though `npm run build` skips on main, the production
-      # bundle is still produced + validated by the multi-stage image
-      # build (and any TypeScript errors would surface there too).
+      # ─── Quality (PR + manual dispatch — a main push skips these) ─
+      # See ci-backend.yml for rationale (incl. the `!= 'push'` gate).
+      # Note: the Docker image build step below performs its own vite
+      # build inside the Dockerfile, so even though `npm run build`
+      # skips on a main push, the production bundle is still produced +
+      # validated by the multi-stage image build (TypeScript errors
+      # surface there too).
       - name: 🟢 Set up Node 22
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -57,22 +61,22 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: 📦 Install dependencies
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: npm ci --no-audit --no-fund
 
       - name: 🔍 TypeScript  ·  tsc --noEmit
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: npx tsc --noEmit
 
       - name: 🔨 Vite build (production)
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: npm run build
 
       - name: 🔐 Audit  ·  npm audit (CRITICAL threshold)
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: npm audit --audit-level=critical
 
-      # ─── Image phase (build + scan; runs on PR AND main) ───────
+      # ─── Image phase (build + scan; runs on every trigger) ─────
       # Single docker build per CI run. See ci-backend.yml for the full
       # rationale on the build-once / retag-and-push design.
       - name: 🐳 Set up Docker Buildx
@@ -110,7 +114,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
 
-      # ─── Publish (main push only) ───────────────────────────────
+      # ─── Publish (main push + manual dispatch) ──────────────────
       # Re-uses the image already in local docker. No second buildx run.
       - name: 🔑 Auth to GCP  ·  Workload Identity Federation
         if: github.event_name != 'pull_request'
