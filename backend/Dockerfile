@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.14.5-slim
 
 # Pick up the latest debian-slim package patches at build time. The
 # python:3.12-slim base tracks debian-12-slim, which gets security backports
