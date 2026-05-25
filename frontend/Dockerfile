@@ -15,7 +15,7 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.31.1-alpine
 
 # Pick up the latest alpine package patches at build time. nginx:1.27-alpine
 # tracks the alpine 3.21 release, which gets security backports faster than
