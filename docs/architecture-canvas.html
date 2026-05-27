@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ProdX — Architecture Canvas</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #0d1117; color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+  /* ── viewport ──────────────────────────────────────────────────── */
+  #wrap { position: fixed; inset: 0; cursor: grab;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0);
+    background-size: 24px 24px; }
+  #wrap.panning { cursor: grabbing; }
+  #canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0;
+    width: 3000px; height: 2000px; }
+
+  /* ── edges (SVG) ───────────────────────────────────────────────── */
+  #edges { position: absolute; top: 0; left: 0; width: 3000px; height: 2000px;
+    pointer-events: none; }
+  .edge { fill: none; stroke-width: 1.6; }
+  .edge.generic  { stroke: #6e7681; }
+  .edge.data     { stroke: #79c0ff; }
+  .edge.deploy   { stroke: #7ee787; }
+  .edge.secret   { stroke: #d2a8ff; stroke-dasharray: 5 4; }
+  .edge.scale    { stroke: #ffc972; stroke-dasharray: 2 4; }
+  .edge.traffic  { stroke: #f78166; stroke-width: 2.2; }
+  .edge-label { font-size: 10px; fill: #8b949e; pointer-events: none;
+    paint-order: stroke; stroke: #0d1117; stroke-width: 3px;
+    stroke-linejoin: round; }
+
+  /* ── groups ────────────────────────────────────────────────────── */
+  .group { position: absolute; border: 1.5px dashed rgba(255,255,255,0.18);
+    border-radius: 14px; background: rgba(255,255,255,0.02); }
+  .group-label { position: absolute; top: -10px; left: 18px;
+    background: #0d1117; padding: 0 10px; font-size: 12px;
+    font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
+    color: #8b949e; }
+
+  /* ── nodes ─────────────────────────────────────────────────────── */
+  .node { position: absolute; padding: 10px 14px; border-radius: 9px;
+    background: #161b22; border: 1px solid #30363d;
+    min-width: 160px; cursor: grab; user-select: none;
+    transition: box-shadow 0.12s, transform 0.12s; }
+  .node:hover { box-shadow: 0 0 0 2px rgba(100,180,255,0.35); z-index: 5; }
+  .node.dragging { cursor: grabbing; box-shadow: 0 6px 20px rgba(0,0,0,0.5); z-index: 10; }
+  .node h3 { margin: 0; font-size: 13px; font-weight: 600; }
+  .node .desc { margin-top: 3px; font-size: 11px; opacity: 0.65; line-height: 1.3; }
+
+  /* category accents */
+  .cat-source   { border-left: 4px solid #58a6ff; }
+  .cat-ci       { border-left: 4px solid #f78166; }
+  .cat-cloud    { border-left: 4px solid #d2a8ff; }
+  .cat-cluster  { border-left: 4px solid #7ee787; }
+  .cat-app      { border-left: 4px solid #ffc972; }
+  .cat-security { border-left: 4px solid #ff7b72; }
+  .cat-edge     { border-left: 4px solid #79c0ff; }
+
+  /* ── UI overlays ───────────────────────────────────────────────── */
+  #legend { position: fixed; bottom: 18px; left: 18px; z-index: 100;
+    background: rgba(22,27,34,0.95); border: 1px solid #30363d;
+    border-radius: 10px; padding: 10px 14px; font-size: 12px; }
+  #legend h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase;
+    color: #8b949e; letter-spacing: 0.5px; }
+  #legend .row { display: grid; grid-template-columns: 16px 1fr; gap: 8px;
+    align-items: center; margin: 3px 0; }
+  #legend .sw { height: 3px; border-radius: 2px; }
+
+  #ctrls { position: fixed; top: 18px; right: 18px; z-index: 100;
+    display: flex; gap: 6px; }
+  #ctrls button { background: #161b22; border: 1px solid #30363d;
+    color: #e6edf3; padding: 6px 11px; border-radius: 6px;
+    cursor: pointer; font-size: 14px; min-width: 32px; }
+  #ctrls button:hover { background: #21262d; }
+
+  #title { position: fixed; top: 18px; left: 18px; z-index: 100;
+    background: rgba(22,27,34,0.95); border: 1px solid #30363d;
+    border-radius: 10px; padding: 10px 14px; }
+  #title h1 { margin: 0; font-size: 15px; font-weight: 600; }
+  #title p { margin: 4px 0 0; font-size: 11px; color: #8b949e; }
+
+  #tooltip { position: fixed; z-index: 200; pointer-events: none;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 8px 12px; font-size: 12px; max-width: 320px;
+    white-space: pre-line;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5); display: none; }
+  #tooltip strong { color: #79c0ff; }
+
+  /* ── Secrets-only highlight mode ───────────────────────────────────
+     Triggered by the 🔐 button. Adds class .secrets-only to <body>,
+     which dims everything except secret-typed edges, their labels,
+     and the nodes that participate in any secret edge (marked at
+     toggle-time with class .secret-node). */
+  body.secrets-only .node:not(.secret-node) { opacity: 0.16; }
+  body.secrets-only .group                  { opacity: 0.35; }
+  body.secrets-only .edge:not(.secret)      { opacity: 0.06; }
+  body.secrets-only .edge.secret            { stroke-width: 2.6; }
+  body.secrets-only .edge-label:not(.secret){ opacity: 0.10; }
+  body.secrets-only .edge-label.secret      { fill: #d2a8ff; font-weight: 600; }
+  body.secrets-only .node.secret-node       { box-shadow: 0 0 0 2px rgba(210,168,255,0.55); }
+
+  /* ── Argo-CD-only highlight mode ───────────────────────────────────
+     Triggered by the 🐙 button. Same idea as the secrets filter, but
+     the subgraph is "everything incident to the argocd node" — picked
+     by edge data-from / data-to instead of edge type. */
+  body.argocd-only .node:not(.argocd-node) { opacity: 0.16; }
+  body.argocd-only .group                  { opacity: 0.35; }
+  body.argocd-only .edge:not([data-from="argocd"]):not([data-to="argocd"])       { opacity: 0.06; }
+  body.argocd-only .edge[data-from="argocd"],
+  body.argocd-only .edge[data-to="argocd"]                                       { stroke-width: 2.6; }
+  body.argocd-only .edge-label:not([data-from="argocd"]):not([data-to="argocd"]) { opacity: 0.10; }
+  body.argocd-only .edge-label[data-from="argocd"],
+  body.argocd-only .edge-label[data-to="argocd"]                                 { fill: #7ee787; font-weight: 600; }
+  body.argocd-only .node.argocd-node       { box-shadow: 0 0 0 2px rgba(126,231,135,0.55); }
+
+  /* ── GKE-only highlight mode ───────────────────────────────────────
+     Triggered by the ☸ button. The "GKE" subgraph is everything that
+     lives inside the cluster: the gke node itself + every node in the
+     system & prodx groups, plus the intra-cluster edges between them.
+     Membership is set-based (not a single endpoint id and not a single
+     edge type), so the toggle JS tags participating nodes with
+     .gke-node and intra-cluster edges/labels with .gke-edge. */
+  body.gke-only .node:not(.gke-node)            { opacity: 0.16; }
+  body.gke-only .group:not(.gke-group)          { opacity: 0.35; }
+  body.gke-only .edge:not(.gke-edge)            { opacity: 0.06; }
+  body.gke-only .edge.gke-edge                  { stroke-width: 2.6; }
+  body.gke-only .edge-label:not(.gke-edge)      { opacity: 0.10; }
+  body.gke-only .edge-label.gke-edge            { fill: #79c0ff; font-weight: 600; }
+  body.gke-only .node.gke-node                  { box-shadow: 0 0 0 2px rgba(121,192,255,0.55); }
+  body.gke-only .group.gke-group                { border-color: rgba(121,192,255,0.55); }
+
+  .node, .edge, .edge-label, .group { transition: opacity 0.18s, stroke-width 0.18s; }
+
+  #secrets-toggle.active { background: #3d2a5c; border-color: #d2a8ff; color: #f3e8ff; }
+  #argocd-toggle.active  { background: #1f4d2a; border-color: #7ee787; color: #d9ffe0; }
+  #gke-toggle.active     { background: #1a3a52; border-color: #79c0ff; color: #d6ecff; }
+
+  /* ── Step-by-step walkthrough ──────────────────────────────────────
+     A numbered strip at the top-center plus a details panel pinned to
+     the left. Click step N → diagram dims everything except the nodes
+     and edges that exist by step N (cumulative). Reuses the same
+     dim-by-CSS-class pattern as the filter modes. */
+  #steps-strip {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 95;
+    background: rgba(22,27,34,0.95); border: 1px solid #30363d;
+    border-radius: 10px; padding: 7px 9px;
+    display: flex; gap: 4px; align-items: center;
+    font-size: 12px;
+  }
+  #steps-strip .label {
+    color: #8b949e; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-right: 4px;
+  }
+  .step-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 24px; height: 24px;
+    padding: 0 7px;
+    background: #21262d; border: 1px solid #30363d;
+    color: #c9d1d9; font-size: 11px; font-weight: 700;
+    border-radius: 5px; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .step-chip:hover { background: #30363d; border-color: #ffc972; color: #ffc972; }
+  .step-chip.done    { background: #2a2516; border-color: #6b5a2c; color: #ffc972; }
+  .step-chip.current { background: #4a3a14; border-color: #ffc972; color: #ffe7a3;
+                       box-shadow: 0 0 0 2px rgba(255,201,114,0.25); }
+
+  /* Destroy chips share the same layout but use a red-orange palette so
+     a "build" walkthrough is visually distinct from a "teardown" one. */
+  .step-chip.destroy            { color: #f78166; border-color: #5c2a36; }
+  .step-chip.destroy:hover      { background: #3a1e26; border-color: #f78166; color: #ffb39e; }
+  .step-chip.destroy.done       { background: #2a1620; color: #f78166; }
+  .step-chip.destroy.current    { background: #4a1c2a; border-color: #f78166; color: #ffd6c8;
+                                  box-shadow: 0 0 0 2px rgba(247,129,102,0.30); }
+  #steps-strip .divider { width: 1px; height: 20px; background: #30363d; margin: 0 4px; }
+  #steps-strip .label.destroy { color: #f78166; }
+  #steps-strip .exit {
+    background: transparent; border: 1px solid #30363d; color: #8b949e;
+    padding: 2px 8px; border-radius: 5px; cursor: pointer; font-size: 11px;
+    margin-left: 6px;
+  }
+  #steps-strip .exit:hover { color: #f78166; border-color: #f78166; }
+
+  #walk-panel {
+    position: fixed; top: 70px; left: 18px; z-index: 95;
+    width: 380px; max-height: calc(100vh - 100px);
+    background: rgba(22,27,34,0.97); border: 1px solid #ffc972;
+    border-radius: 10px; padding: 14px 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    font-size: 12px; line-height: 1.55;
+    overflow-y: auto;
+    display: none;
+  }
+  body.walking #walk-panel { display: block; }
+  body.walking-destroy #walk-panel { border-color: #f78166; }
+  #walk-panel .num {
+    display: inline-block; background: #ffc972; color: #0d1117;
+    width: 22px; height: 22px; line-height: 22px; text-align: center;
+    border-radius: 50%; font-weight: 800; font-size: 12px;
+    margin-right: 8px;
+  }
+  body.walking-destroy #walk-panel .num { background: #f78166; }
+  body.walking-destroy #walk-panel h2 { color: #ffd6c8; }
+  body.walking-destroy .node.walk-on        { box-shadow: 0 0 0 2px rgba(247,129,102,0.55); }
+  body.walking-destroy .edge.walk-on        { stroke: #f78166; }
+  body.walking-destroy .edge-label.walk-on  { fill: #f78166; }
+  body.walking-destroy .group.walk-group    { border-color: rgba(247,129,102,0.55); }
+  #walk-panel h2 { margin: 0 0 6px; font-size: 14px; color: #ffe7a3; display: flex; align-items: center; }
+  #walk-panel .where {
+    color: #8b949e; font-size: 11px; margin-bottom: 8px;
+    font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  #walk-panel .notes { color: #c9d1d9; margin-bottom: 10px; }
+  #walk-panel .notes b { color: #ffe7a3; }
+  #walk-panel pre {
+    background: #0d1117; color: #c9d1d9;
+    padding: 9px 11px; border-radius: 6px; overflow-x: auto;
+    font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size: 11px; line-height: 1.55; margin: 0;
+    white-space: pre;
+  }
+  #walk-panel pre .c { color: #8b949e; }
+  #walk-panel .creates {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid #30363d;
+    font-size: 11px; color: #8b949e;
+  }
+  #walk-panel .creates b { color: #ffe7a3; }
+  #walk-panel .nav {
+    margin-top: 12px; display: flex; gap: 6px; align-items: center;
+  }
+  #walk-panel .nav button {
+    background: #21262d; border: 1px solid #30363d; color: #e6edf3;
+    padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  }
+  #walk-panel .nav button:hover:not(:disabled) { background: #30363d; }
+  #walk-panel .nav button:disabled { opacity: 0.35; cursor: not-allowed; }
+  #walk-panel .progress { color: #8b949e; font-size: 11px; margin-left: auto; }
+
+  /* Walking dim: same idea as the filter modes, but the "active" set is
+     computed cumulatively from steps 1..n by JS and tagged with .walk-on. */
+  body.walking .node:not(.walk-on)       { opacity: 0.10; }
+  body.walking .edge:not(.walk-on)       { opacity: 0.06; }
+  body.walking .edge-label:not(.walk-on) { opacity: 0.10; }
+  body.walking .group:not(.walk-group)   { opacity: 0.40; }
+  body.walking .node.walk-on             { box-shadow: 0 0 0 2px rgba(255,201,114,0.55); }
+  body.walking .edge.walk-on             { stroke-width: 2.4; }
+  body.walking .edge-label.walk-on       { fill: #ffc972; font-weight: 600; }
+  body.walking .group.walk-group         { border-color: rgba(255,201,114,0.55); }
+</style>
+</head>
+<body>
+
+<div id="title">
+  <h1>ProdX — Architecture Canvas</h1>
+  <p>drag nodes · drag background to pan · wheel to zoom · hover for details</p>
+</div>
+
+<div id="ctrls">
+  <button onclick="zoomBy(1.2)">+</button>
+  <button onclick="zoomBy(1/1.2)">−</button>
+  <button onclick="resetView()" title="Reset">⌂</button>
+  <button onclick="autoLayout()" title="Re-layout">↻</button>
+  <button id="secrets-toggle" onclick="toggleSecretsHighlight()"
+          title="Highlight only the secrets path (Vault → consumers)">🔐</button>
+  <button id="argocd-toggle"  onclick="toggleArgocdHighlight()"
+          title="Highlight only the Argo CD GitOps path (poll ProdXCD → apply manifests)">🐙</button>
+  <button id="gke-toggle"     onclick="toggleGkeHighlight()"
+          title="Highlight only GKE — the cluster + its system &amp; prodx namespaces">☸</button>
+</div>
+
+<div id="legend">
+  <h4>Edge types</h4>
+  <div class="row"><div class="sw" style="background:#6e7681"></div>generic</div>
+  <div class="row"><div class="sw" style="background:#79c0ff"></div>data / API</div>
+  <div class="row"><div class="sw" style="background:#7ee787"></div>deploy / apply</div>
+  <div class="row"><div class="sw" style="background:#d2a8ff"></div>secret read</div>
+  <div class="row"><div class="sw" style="background:#ffc972"></div>autoscale</div>
+  <div class="row"><div class="sw" style="background:#f78166"></div>user traffic</div>
+  <div style="margin-top:8px; padding-top:8px; border-top:1px solid #30363d; font-size:11px; color:#8b949e;">
+    Top-right buttons isolate a subgraph:<br>
+    <b>🔐</b> secrets path (Vault → consumers)<br>
+    <b>🐙</b> Argo CD path (poll repo → apply manifests)<br>
+    <b>☸</b> GKE — cluster + in-cluster edges
+  </div>
+  <div style="margin-top:8px; padding-top:8px; border-top:1px solid #30363d; font-size:11px; color:#8b949e;">
+    Top chips: <b>1…11</b> walk the build; <b style="color:#f78166;">12…16</b> walk the teardown
+    (destroy in reverse order; project_id locks 30 days at step 15).
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- Step walkthrough: numbered chips at the top, details panel on the left -->
+<div id="steps-strip">
+  <span class="label">Walkthrough</span>
+  <!-- chips injected by renderStepStrip() -->
+</div>
+<div id="walk-panel">
+  <h2><span class="num" id="walk-num">1</span><span id="walk-title">…</span></h2>
+  <div class="where" id="walk-where"></div>
+  <div class="notes" id="walk-notes"></div>
+  <pre id="walk-commands"></pre>
+  <div class="creates" id="walk-creates"></div>
+  <div class="nav">
+    <button id="walk-prev" onclick="prevStep()">◀ Prev</button>
+    <button id="walk-next" onclick="nextStep()">Next ▶</button>
+    <button onclick="exitWalkthrough()">Exit</button>
+    <span class="progress" id="walk-progress"></span>
+  </div>
+</div>
+
+<div id="wrap">
+  <div id="canvas">
+    <svg id="edges" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="ah-generic" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#6e7681"/>
+        </marker>
+        <marker id="ah-data" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#79c0ff"/>
+        </marker>
+        <marker id="ah-deploy" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/>
+        </marker>
+        <marker id="ah-secret" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#d2a8ff"/>
+        </marker>
+        <marker id="ah-scale" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#ffc972"/>
+        </marker>
+        <marker id="ah-traffic" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#f78166"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+</div>
+
+<script>
+// ── Data ─────────────────────────────────────────────────────────────
+const GROUPS = [
+  { id:'dev',        label:'Source & CI',                     x: 40,   y: 60,   w: 460, h: 380 },
+  { id:'gcp',        label:'Google Cloud project',            x: 540,  y: 60,   w: 270, h: 380 },
+  { id:'system',     label:'GKE — control plane + system ns', x: 850,  y: 60,   w: 250, h: 360 },
+  { id:'prodx',      label:'GKE — prodx namespace',           x: 1140, y: 60,   w: 540, h: 640 },
+  { id:'saas',       label:'External SaaS',                   x: 850,  y: 440,  w: 250, h: 180 },
+  { id:'cloudflare', label:'Cloudflare (tunnel + edge)',      x: 850,  y: 640,  w: 250, h: 380 },
+  { id:'user',       label:'End user',                        x: 540,  y: 1040, w: 270, h: 80  },
+];
+
+const NODES = [
+  // Source & CI
+  { id:'cursor',     label:'Cursor',           desc:'AI PR review',                cat:'source', x: 70,  y: 110,
+    tip:'AI assistant invoked by GitHub Actions to post a second-opinion review on every PR.' },
+  { id:'laptop',     label:'Developer laptop', desc:'git push · terraform apply',  cat:'source', x: 70,  y: 195,
+    tip:'You. Pushes code, runs Terraform locally for the bootstrap envs. In Mode A also runs `vault login` once — TF then reads secrets at apply time via data.vault_kv_secret_v2 (Cloudflare API token, GitHub PAT) and seeds initial values into Vault via envs/vault-bootstrap (postgres/cloudflare/github/cursor).' },
+  { id:'dependabot', label:'Dependabot',       desc:'dependency PRs',              cat:'ci',     x: 70,  y: 280,
+    tip:'GitHub-native bot that opens PRs to bump npm / pip / actions versions.' },
+  { id:'github',     label:'GitHub',           desc:'ProdX · ProdXTF · ProdXCD',   cat:'source', x: 290, y: 110,
+    tip:'Three repos: app source (ProdX), infra (ProdXTF), Helm chart (ProdXCD). Main branch is PR-only (ruleset).' },
+  { id:'gha',        label:'GitHub Actions',   desc:'build · Trivy scan · push',   cat:'ci',     x: 290, y: 210,
+    tip:'CI runs on every PR + main push: builds images, scans with Trivy, pushes to Artifact Registry via WIF, then kubectl rollout restart.' },
+  { id:'hcp',        label:'HCP Terraform',    desc:'state · run pipeline',        cat:'ci',     x: 290, y: 310,
+    tip:'Hosted Terraform: state backend and run pipeline. ProdXTF is wired here so applies happen in HCP, not on your laptop.' },
+
+  // GCP
+  { id:'wif',  label:'WIF + publisher SA',  desc:'OIDC → impersonate gha-prodx-publisher', cat:'security', x: 570, y: 110,
+    tip:'Three GCP resources, drawn as one node: (1) Workload Identity Pool github-pool-<hex> with an OIDC provider whose attribute_condition gates by repository "<owner>/ProdX"; (2) Service Account gha-prodx-publisher@<project>.iam.gserviceaccount.com that the OIDC token impersonates; (3) IAM bindings on the SA — roles/artifactregistry.writer on the GAR repo (push) and roles/container.developer at project scope (kubectl rollout restart). GitHub Actions trades its OIDC JWT for a 1-hour token bound to that SA. No JSON key stored anywhere.' },
+  { id:'gar',  label:'Artifact Registry',   desc:'prodx-api · prodx-web',        cat:'cloud',    x: 570, y: 210,
+    tip:'Private Google Artifact Registry repo (Docker format) in the project. CI pushes images via WIF→publisher SA. GKE nodes pull via the default compute SA (granted roles/artifactregistry.reader on the repo) — no imagePullSecret in the chart.' },
+  { id:'gke',  label:'GKE cluster',         desc:'zonal · Spot · e2-medium · 1→3', cat:'cluster',  x: 570, y: 310,
+    tip:'Zonal GKE cluster (europe-west3-a) with Workload Identity enabled. Node pool autoscales 1→3 Spot VMs (machine_type=e2-medium, bumped from the e2-small default once Argo CD + ESO were both running). GCP-managed control plane exposes the K8s API at https://<endpoint>.' },
+
+  // K8s control plane + system namespaces
+  { id:'k8s-api',     label:'K8s API server', desc:'GKE-managed control plane',   cat:'cluster', x: 880, y: 85,
+    tip:'The cluster\'s Kubernetes API endpoint. Three distinct clients hit it: (1) you/Terraform on the laptop (kubectl, kubernetes_manifest, helm) — uses gcloud ADC; (2) GitHub Actions (kubectl rollout restart) — uses the WIF-impersonated publisher SA + roles/container.developer; (3) Vault — calls TokenReview here using the vault-auth-reviewer SA (system:auth-delegator) to validate every ESO login JWT.' },
+  { id:'argocd',      label:'Argo CD',        desc:'chart 7.7.7 · GitOps reconciler', cat:'cluster', x: 880, y: 155,
+    tip:'Helm release of argo-cd v7.7.7 in the argocd namespace (modules/argocd). Reconciles two Application CRs that Terraform planted via kubernetes_manifest in envs/dev/argocd_apps.tf: (1) "prodx" → polls github.com/<owner>/ProdXCD every ~3min, renders charts/prodx with image-repo Helm overrides; (2) "external-secrets" → pulls the ESO chart from https://charts.external-secrets.io (NOT GitHub) and installs ESO with serviceAccount.name=external-secrets-prodx. ServerSideApply enabled.' },
+  { id:'eso',         label:'ESO',            desc:'reads Vault · writes K8s Secrets', cat:'cluster', x: 880, y: 235,
+    tip:'External Secrets Operator. Auth flow: presents its ServiceAccount JWT (external-secrets/external-secrets-prodx) to Vault\'s kubernetes auth method → Vault calls TokenReview against the K8s API (using its own reviewer SA in vault-auth ns, granted system:auth-delegator) → Vault returns a token bound to the prodx-app-read policy (1h TTL) → ESO reads the KV path named in each ExternalSecret CR (e.g. secret/prodx/postgres) → ESO writes/updates a K8s Secret (postgres-credentials). Refresh = 1h. Only installed in Mode A (use_vault=true) — in Mode B the chart renders a plain Secret directly and ESO is skipped.' },
+  { id:'cloudflared', label:'cloudflared',    desc:'outbound tunnel pods',  cat:'cluster', x: 880, y: 315,
+    tip:'Cloudflare Tunnel connector (2 replicas, cloudflare/cloudflared:latest). Outbound-only: opens a long-lived connection to Cloudflare\'s edge and routes incoming requests to three in-cluster Services based on hostname — prodx-web.prodx:80, prodx-api.prodx:8000, argocd-server.argocd:80. No public IP on the cluster.' },
+
+  // prodx namespace — top row: web
+  { id:'svc-web', label:'Service: prodx-web', desc:'ClusterIP :80',  cat:'app', x: 1170, y: 110,
+    tip:'ClusterIP service in front of the nginx pods. Routed to from cloudflared.' },
+  { id:'dep-web', label:'Deployment: prodx-web', desc:'nginx (Vite build)', cat:'app', x: 1410, y: 110,
+    tip:'Static React build served by nginx. Proxies /api/* to prodx-api Service.' },
+  { id:'hpa-web', label:'HPA: prodx-web', desc:'1→3 · CPU 70%', cat:'app', x: 1410, y: 195,
+    tip:'HorizontalPodAutoscaler v2. Targets prodx-web Deployment, scales between 1 and 3 replicas at 70% CPU utilization.' },
+
+  // prodx namespace — middle row: api
+  { id:'svc-api', label:'Service: prodx-api', desc:'ClusterIP :8000', cat:'app', x: 1170, y: 280,
+    tip:'ClusterIP service in front of FastAPI pods. Reached from prodx-web via in-cluster DNS.' },
+  { id:'dep-api', label:'Deployment: prodx-api', desc:'FastAPI',     cat:'app', x: 1410, y: 280,
+    tip:'FastAPI app. Probes: readiness /health (5s/5s), liveness /health (30s/30s). Requests cpu: 50m.' },
+  { id:'hpa-api', label:'HPA: prodx-api', desc:'1→5 · CPU 70%',      cat:'app', x: 1410, y: 365,
+    tip:'HorizontalPodAutoscaler v2. Targets prodx-api Deployment, scales between 1 and 5 replicas at 70% CPU utilization.' },
+
+  // prodx namespace — data row (headless services)
+  { id:'postgres', label:'StatefulSet: postgres', desc:'headless svc · :5432', cat:'app', x: 1170, y: 450,
+    tip:'StatefulSet (replicas=1) with a 1Gi PVC (storageClassName=standard-rwo). Probes: pg_isready -U <user> -d <db> (readiness 5s/5s, liveness 30s/30s). Fronted by a headless Service (clusterIP=None) so pods are addressed via stable DNS prodgres-0.postgres. Not autoscaled — stateful.' },
+  { id:'redis',    label:'StatefulSet: redis',    desc:'headless svc · :6379', cat:'app', x: 1410, y: 450,
+    tip:'StatefulSet with 256Mi PVC (standard-rwo). Cache layer fronting Postgres for the graph data. Headless Service — same DNS pattern as postgres.' },
+
+  // prodx namespace — security row
+  { id:'secret-pg',    label:'Secret: postgres-credentials', desc:'4 keys · consumed by postgres + prodx-api', cat:'security', x: 1170, y: 540,
+    tip:'K8s Secret (Opaque) with 4 keys: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, DATABASE_URL. Consumers: (1) postgres StatefulSet mounts it via envFrom → all 4 vars land in the container env; (2) prodx-api Deployment mounts only DATABASE_URL via valueFrom.secretKeyRef. In Mode A (use_vault=true) ESO creates it from Vault. In Mode B the Helm chart renders it directly from values passed in by Terraform. Either way, the Secret name and shape are identical — the consumers never know which mode produced it.' },
+  { id:'es-pg',        label:'ExternalSecret',               desc:'→ secret/prodx/postgres (Mode A only)',     cat:'security', x: 1410, y: 540,
+    tip:'CR that tells ESO which Vault path to read (key: prodx/postgres) and how to map its three fields (username/password/database) into the resulting K8s Secret\'s 4 keys (DATABASE_URL is composed via target.template at materialization). Only rendered when .Values.secrets.useVault is true (Mode A).' },
+  { id:'clusterstore', label:'ClusterSecretStore',           desc:'vault-prodx (Mode A only)',                 cat:'security', x: 1290, y: 620,
+    tip:'Cluster-scoped CR that tells ESO how to dial Vault: server URL (.Values.vault.address), KV mount, K8s auth method mount, role name (prodx-eso), and the serviceAccountRef (external-secrets/external-secrets-prodx). Cluster-scoped — not namespaced — because the SA it references lives in a different namespace (external-secrets) than where the ExternalSecret lives (prodx). Only rendered when .Values.secrets.useVault is true (Mode A).' },
+
+  // SaaS — Vault + the public Helm chart repo for ESO
+  { id:'helm-repo', label:'charts.external-secrets.io', desc:'public Helm repo', cat:'edge',     x: 880, y: 475,
+    tip:'Public Helm chart repository. Argo CD\'s "external-secrets" Application sources the ESO chart from here directly — not from ProdXCD. That\'s why argocd polls two sources: the ProdXCD git repo for prodx workloads, and this chart repo for ESO itself.' },
+  { id:'vault',     label:'HashiCorp Vault (optional)',  desc:'KV-v2 · K8s auth',  cat:'security', x: 880, y: 555,
+    tip:'External Vault server (vault.pbcv.dev). Sources of secrets:\n  • secret/prodx/postgres  → username, password, database (consumer: ESO → postgres-credentials → postgres + prodx-api)\n  • secret/prodx/cloudflare → api_token, account_id, zone_id (consumer: Terraform on laptop, when read_secrets_from_vault=true → Cloudflare provider in envs/dev)\n  • secret/prodx/github     → pat (consumer: Terraform on laptop → GitHub provider in envs/github-bootstrap + ci_variables in envs/dev)\n  • secret/prodx/cursor     → token (consumer: Terraform on laptop → github_actions_secret CURSOR on the ProdX repo, used by pr-review.yml)\nAuth methods: kubernetes (for in-cluster ESO; role prodx-eso bound to SA external-secrets/external-secrets-prodx with policy prodx-app-read; TokenReview validated via reviewer SA in the vault-auth namespace) and userpass/OIDC (for you on the laptop). Initial values are seeded by envs/vault-bootstrap. Optional — skipped in Mode B, where every read above falls back to terraform.tfvars.' },
+
+  // Cloudflare — split into the four real TF / network resources.
+  // Visual order top-to-bottom matches the request flow in reverse:
+  //   cf-tunnel sits next to cloudflared (the in-cluster side it pairs with),
+  //   then cf-ingress (rules attached to it), then cf-edge, then cf-dns at
+  //   the bottom (closest to the browser/user group).
+  { id:'cf-tunnel',  label:'Tunnel',         desc:'cloudflare_zero_trust_tunnel_cloudflared', cat:'edge', x: 880, y: 680,
+    tip:'The "named tunnel" resource on Cloudflare\'s side. Created by Terraform in modules/cloudflare/main.tf with a random 32-byte secret (random_id.tunnel_secret) and config_src="cloudflare" (config managed via the cloudflared_config resource, not via a local YAML). Has a run token (read back via the cloudflare_zero_trust_tunnel_cloudflared_token data source) that the in-cluster cloudflared pod uses to authenticate when it dials Cloudflare\'s edge outbound. The token never sits in tfvars or Vault — Terraform pipes it straight into a K8s Secret (cloudflared-tunnel-token) in modules/cloudflared, mounted as TUNNEL_TOKEN on the pod.' },
+  { id:'cf-ingress', label:'Tunnel ingress',  desc:'cloudflare_zero_trust_tunnel_cloudflared_config', cat:'edge', x: 880, y: 755,
+    tip:'Routing rules attached to the tunnel above. One rule per hostname (built from var.hostnames in envs/dev):\n  • argocd.<domain>   → http://argocd-server.argocd:80\n  • prodx.<domain>    → http://prodx-web.prodx:80\n  • prodxapi.<domain> → http://prodx-api.prodx:8000\n  + a catch-all {service: "http_status:404"} as the last rule. When a request hits the edge with a matching Host header, the tunnel forwards it to the in-cluster Service URL listed here.' },
+  { id:'cf-edge',    label:'Cloudflare edge',  desc:'anycast · TLS · WAF',                cat:'edge', x: 880, y: 830,
+    tip:'Cloudflare\'s anycast network of edge servers. Terminates TLS for the three public hostnames (free Universal certs auto-issued because the zone is on Cloudflare), applies WAF rules, then forwards the request through the tunnel based on the cf-ingress rules. Not provisioned by Terraform — it\'s the platform.' },
+  { id:'cf-dns',     label:'DNS (3 proxied CNAMEs)', desc:'cloudflare_dns_record × 3',     cat:'edge', x: 880, y: 905,
+    tip:'Three DNS records created by Terraform in modules/cloudflare/main.tf (cloudflare_dns_record.tunnel, for_each over var.hostnames):\n  • argocd.<domain>   CNAME <tunnel_id>.cfargotunnel.com  (proxied)\n  • prodx.<domain>    CNAME <tunnel_id>.cfargotunnel.com  (proxied)\n  • prodxapi.<domain> CNAME <tunnel_id>.cfargotunnel.com  (proxied)\nAll proxied=true (the orange-cloud icon), so a browser DNS lookup actually returns Cloudflare anycast IPs (the edge), not the cfargotunnel.com endpoint — the tunnel routing happens internally at the edge.' },
+
+  // User
+  { id:'browser', label:'User browser', desc:'prodx · prodxapi · argocd .<domain>', cat:'edge', x: 570, y: 1070,
+    tip:'Public entry points (3 hostnames on the apex domain set by var.cloudflare_domain): https://prodx.<domain> (the website), https://prodxapi.<domain> (the API), https://argocd.<domain> (Argo CD UI). All resolve via cf-dns to Cloudflare anycast IPs; none touch the cluster directly.' },
+];
+
+const EDGES = [
+  // ── Source flow ──────────────────────────────────────────────────
+  { from:'laptop',     to:'github', label:'git push' },
+  { from:'dependabot', to:'github', label:'auto-PRs' },
+  { from:'github',     to:'gha',    label:'webhook (push/PR)',  type:'data' },
+  // Cursor is INVOKED by CI (cursor-agent CLI) and posts back via gh pr comment
+  // with the workflow's GITHUB_TOKEN — it never talks to GitHub directly.
+  // (Previous canvas had a phantom `cursor → github` edge.)
+  { from:'gha', to:'cursor', label:'invoke cursor-agent (uses secrets.CURSOR)', type:'data' },
+  { from:'gha', to:'github', label:'gh pr comment (review)',                    type:'data' },
+  // HCP is state-backend only. Workspaces run execution_mode=Local, so HCP has
+  // no VCS connection — the previous `github → hcp "webhook"` edge was phantom.
+  { from:'laptop', to:'hcp', label:'state push/pull (HCP execution=Local)', type:'data' },
+
+  // ── Terraform plants the platform (laptop runs apply, not HCP) ──
+  // envs/dev creates VPC, GKE, GAR, WIF, Cloudflare resources;
+  // envs/dev/argocd_apps.tf also plants two kubernetes_manifest Application CRs
+  // via the kubernetes provider (laptop → k8s-api).
+  { from:'laptop', to:'gke',     label:'terraform apply (cluster, VPC, GAR, WIF, CF)', type:'deploy' },
+  { from:'laptop', to:'k8s-api', label:'kubernetes_manifest (Argo Apps, reviewer SA)', type:'deploy' },
+
+  // ── CI → cloud (image build + push + rollout) ────────────────────
+  { from:'gha', to:'wif',     label:'OIDC → impersonate publisher SA',            type:'deploy' },
+  { from:'wif', to:'gar',     label:'push image (artifactregistry.writer)',       type:'deploy' },
+  { from:'gha', to:'k8s-api', label:'kubectl rollout (publisher SA + container.developer)', type:'deploy' },
+  { from:'gar', to:'gke',     label:'image pull (GKE node SA → artifactregistry.reader)',   type:'data' },
+
+  // ── Argo CD: two sources, then apply manifests in-cluster ───────
+  { from:'argocd', to:'github',       label:'poll ProdXCD git',                     type:'data' },
+  { from:'argocd', to:'helm-repo',    label:'fetch external-secrets chart',         type:'data' },
+  { from:'argocd', to:'dep-web',      label:'apply',                                type:'deploy' },
+  { from:'argocd', to:'dep-api',      label:'apply',                                type:'deploy' },
+  { from:'argocd', to:'postgres',     label:'apply',                                type:'deploy' },
+  { from:'argocd', to:'redis',        label:'apply',                                type:'deploy' },
+  { from:'argocd', to:'hpa-web',      label:'apply',                                type:'deploy' },
+  { from:'argocd', to:'hpa-api',      label:'apply',                                type:'deploy' },
+  { from:'argocd', to:'es-pg',        label:'apply (Mode A)',                       type:'deploy' },
+  { from:'argocd', to:'clusterstore', label:'apply (Mode A)',                       type:'deploy' },
+  { from:'argocd', to:'secret-pg',    label:'apply (Mode B → plain Secret)',        type:'deploy' },
+
+  // ── Secrets path ─────────────────────────────────────────────────
+  // Mode A (use_vault=true). The runtime read path is:
+  //   ESO ← ExternalSecret (which kv path) → Vault → TokenReview vs K8s API →
+  //   ESO writes postgres-credentials → postgres + prodx-api consume.
+  // The TF-apply-time read path is the laptop fetching cloudflare / github /
+  // cursor tokens out of Vault and reusing them in other providers.
+  { from:'es-pg',     to:'eso',          label:'ExternalSecret CR (which kv path)',  type:'secret' },
+  { from:'clusterstore', to:'eso',       label:'ClusterSecretStore (Vault address + role)', type:'secret' },
+  { from:'eso',       to:'vault',        label:'k8s-auth login + read secret/prodx/postgres', type:'secret' },
+  { from:'vault',     to:'k8s-api',      label:'TokenReview (vault-auth reviewer SA, system:auth-delegator)', type:'secret' },
+  { from:'eso',       to:'secret-pg',    label:'write postgres-credentials (4 keys)', type:'secret' },
+  { from:'secret-pg', to:'postgres',     label:'envFrom → POSTGRES_USER/PASSWORD/DB', type:'secret' },
+  { from:'secret-pg', to:'dep-api',      label:'valueFrom → DATABASE_URL',            type:'secret' },
+  // TF-apply-time reads (Mode A, read_secrets_from_vault=true).
+  { from:'laptop',    to:'vault',        label:'vault login + data.vault_kv_secret_v2 (cloudflare/github/cursor)', type:'secret' },
+  // CURSOR chain — github-bootstrap plants the Actions secret from Vault
+  // (Mode A) or tfvars (Mode B); pr-review.yml reads secrets.CURSOR.
+  { from:'laptop',    to:'github',       label:'plant secrets.CURSOR (envs/github-bootstrap)', type:'secret' },
+
+  // ── HPA → Deployment ─────────────────────────────────────────────
+  { from:'hpa-web', to:'dep-web', label:'scale 1→3', type:'scale' },
+  { from:'hpa-api', to:'dep-api', label:'scale 1→5', type:'scale' },
+
+  // ── App internal ─────────────────────────────────────────────────
+  { from:'svc-web', to:'dep-web',  label:'' },
+  { from:'svc-api', to:'dep-api',  label:'' },
+  { from:'dep-web', to:'svc-api',  label:'proxy /api/* → prodx-api:8000', type:'data' },
+  { from:'dep-api', to:'postgres', label:'SQL (DATABASE_URL)',            type:'data' },
+  { from:'dep-api', to:'redis',    label:'cache (REDIS_URL)',             type:'data' },
+
+  // ── Cloudflare creation (Terraform plants every CF resource) ─────
+  // modules/cloudflare/main.tf — 1 random_id, 1 tunnel, 1 ingress config
+  // and 3 DNS CNAMEs. The cloudflared K8s side (modules/cloudflared) is
+  // also planted by laptop terraform apply.
+  { from:'laptop', to:'cf-tunnel',   label:'create tunnel + random secret', type:'deploy' },
+  { from:'laptop', to:'cf-ingress',  label:'create ingress rules (3 hostnames + catch-all 404)', type:'deploy' },
+  { from:'laptop', to:'cf-dns',      label:'create 3 proxied CNAMEs', type:'deploy' },
+  { from:'laptop', to:'cloudflared', label:'deploy connector + TUNNEL_TOKEN Secret', type:'deploy' },
+
+  // ── Cloudflare config wiring (read-only relationships) ───────────
+  // cf-ingress is a config attached to cf-tunnel; cf-dns CNAMEs point at
+  // <tunnel_id>.cfargotunnel.com so the edge can find the right tunnel.
+  { from:'cf-ingress', to:'cf-tunnel', label:'attached to tunnel_id', type:'data' },
+  { from:'cf-dns',     to:'cf-tunnel', label:'CNAME → <tunnel_id>.cfargotunnel.com', type:'data' },
+
+  // ── User traffic — full path, separate Cloudflare components ────
+  // Request flow (bottom-up visually): browser → cf-dns (resolve) → cf-edge
+  // (TLS terminate) → cf-tunnel (match cf-ingress rule) → cloudflared pod →
+  // in-cluster Service. Only cloudflared crosses into the cluster.
+  { from:'browser',  to:'cf-dns',  label:'DNS query (3 hostnames)',                  type:'traffic' },
+  { from:'cf-dns',   to:'cf-edge', label:'anycast IP answer (proxied)',              type:'traffic' },
+  { from:'browser',  to:'cf-edge', label:'HTTPS (TLS terminated here)',              type:'traffic' },
+  { from:'cf-edge',  to:'cf-tunnel', label:'route via tunnel (lookup cf-ingress)',   type:'traffic' },
+  // Two arrows between cf-tunnel and cloudflared: the pod *dials out* using
+  // TUNNEL_TOKEN, then requests ride that same tunnel back inbound.
+  { from:'cloudflared', to:'cf-tunnel',   label:'outbound dial (TUNNEL_TOKEN auth)', type:'traffic' },
+  { from:'cf-tunnel',   to:'cloudflared', label:'deliver request (per cf-ingress)',  type:'traffic' },
+  // Only the in-cluster connector reaches workloads — and only to the three
+  // Services named in cf-ingress.
+  { from:'cloudflared', to:'svc-web',     label:'prodx.<domain> → :80',              type:'traffic' },
+  { from:'cloudflared', to:'svc-api',     label:'prodxapi.<domain> → :8000',         type:'traffic' },
+  { from:'cloudflared', to:'argocd',      label:'argocd.<domain> → :80',             type:'traffic' },
+];
+
+// ── Wiring ───────────────────────────────────────────────────────────
+const wrap      = document.getElementById('wrap');
+const canvas    = document.getElementById('canvas');
+const edgesSvg  = document.getElementById('edges');
+const tooltip   = document.getElementById('tooltip');
+
+let scale = 0.85, panX = -20, panY = -30;
+const nodeById = Object.fromEntries(NODES.map(n => [n.id, n]));
+
+function applyTransform() {
+  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+}
+
+function renderGroups() {
+  for (const g of GROUPS) {
+    const el = document.createElement('div');
+    el.className = 'group';
+    el.style.left = g.x + 'px';
+    el.style.top = g.y + 'px';
+    el.style.width = g.w + 'px';
+    el.style.height = g.h + 'px';
+    el.innerHTML = `<div class="group-label">${g.label}</div>`;
+    canvas.appendChild(el);
+    g._el = el;
+  }
+}
+
+function renderNodes() {
+  for (const n of NODES) {
+    const el = document.createElement('div');
+    el.className = 'node cat-' + n.cat;
+    el.id = 'node-' + n.id;
+    el.style.left = n.x + 'px';
+    el.style.top = n.y + 'px';
+    el.innerHTML = `<h3>${n.label}</h3><div class="desc">${n.desc}</div>`;
+    canvas.appendChild(el);
+    n._el = el;
+
+    // drag
+    el.addEventListener('mousedown', e => beginNodeDrag(e, n));
+    // tooltip
+    el.addEventListener('mouseenter', e => showTip(e, n));
+    el.addEventListener('mousemove',  e => moveTip(e));
+    el.addEventListener('mouseleave', hideTip);
+  }
+}
+
+function nodeRect(n) {
+  return { x: n.x, y: n.y, w: n._el.offsetWidth, h: n._el.offsetHeight };
+}
+
+function anchorBetween(a, b) {
+  // pick anchor on the side of the rect facing the other rect
+  const ac = { x: a.x + a.w/2, y: a.y + a.h/2 };
+  const bc = { x: b.x + b.w/2, y: b.y + b.h/2 };
+  const dx = bc.x - ac.x, dy = bc.y - ac.y;
+  const aSide = Math.abs(dx) * a.h > Math.abs(dy) * a.w
+    ? { x: ac.x + Math.sign(dx) * a.w/2, y: ac.y }
+    : { x: ac.x, y: ac.y + Math.sign(dy) * a.h/2 };
+  const bSide = Math.abs(dx) * b.h > Math.abs(dy) * b.w
+    ? { x: bc.x - Math.sign(dx) * b.w/2, y: bc.y }
+    : { x: bc.x, y: bc.y - Math.sign(dy) * b.h/2 };
+  return [aSide, bSide];
+}
+
+function bezier(a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const horizontal = Math.abs(dx) > Math.abs(dy);
+  const k = 0.5;
+  const cp1 = horizontal ? { x: a.x + dx*k, y: a.y } : { x: a.x, y: a.y + dy*k };
+  const cp2 = horizontal ? { x: b.x - dx*k, y: b.y } : { x: b.x, y: b.y - dy*k };
+  return `M${a.x},${a.y} C${cp1.x},${cp1.y} ${cp2.x},${cp2.y} ${b.x},${b.y}`;
+}
+
+function renderEdges() {
+  // clear everything except <defs>
+  for (const child of [...edgesSvg.children]) {
+    if (child.tagName !== 'defs') edgesSvg.removeChild(child);
+  }
+  // The GKE filter tags edges via a JS-set class (`gke-edge`), so any
+  // re-render (e.g. on drag) drops those tags. Capture the active mode
+  // here and re-apply it after rebuilding — defined at the bottom of
+  // this function. (The secrets / argocd filters use data-* attribute
+  // selectors set during this loop, so they survive automatically.)
+  for (const e of EDGES) {
+    const a = nodeById[e.from], b = nodeById[e.to];
+    if (!a || !b) continue;
+    const [pa, pb] = anchorBetween(nodeRect(a), nodeRect(b));
+    const type = e.type || 'generic';
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', bezier(pa, pb));
+    path.setAttribute('class', 'edge ' + type);
+    path.setAttribute('marker-end', `url(#ah-${type})`);
+    // data-from / data-to let the per-node highlights (e.g. Argo CD) match
+    // edges by their endpoints instead of by type.
+    path.setAttribute('data-from', e.from);
+    path.setAttribute('data-to',   e.to);
+    edgesSvg.appendChild(path);
+
+    if (e.label) {
+      const mx = (pa.x + pb.x) / 2;
+      const my = (pa.y + pb.y) / 2 - 4;
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', mx);
+      t.setAttribute('y', my);
+      t.setAttribute('text-anchor', 'middle');
+      // type-tag the label too so the secrets-only filter can dim non-secret labels
+      t.setAttribute('class', 'edge-label ' + type);
+      t.setAttribute('data-from', e.from);
+      t.setAttribute('data-to',   e.to);
+      t.textContent = e.label;
+      edgesSvg.appendChild(t);
+    }
+  }
+  // Re-tag intra-cluster edges if the GKE filter is currently active —
+  // typeof guard so this no-ops on the first call before setFilter exists.
+  if (typeof gkeOnly !== 'undefined' && gkeOnly) {
+    for (const el of edgesSvg.querySelectorAll('.edge, .edge-label')) {
+      const f = el.getAttribute('data-from');
+      const t = el.getAttribute('data-to');
+      if (GKE_NODE_IDS.has(f) && GKE_NODE_IDS.has(t)) el.classList.add('gke-edge');
+    }
+  }
+  // Same idea for the walkthrough: walk-on tagging is JS-set, so a
+  // re-render (e.g. on drag) would otherwise drop it.
+  if (typeof walkStep !== 'undefined' && walkStep != null) {
+    applyEdgeWalkClasses(walkScope(walkStep).edges);
+  }
+}
+
+// ── Interaction: drag nodes ──────────────────────────────────────────
+function beginNodeDrag(e, n) {
+  e.stopPropagation();
+  e.preventDefault();
+  n._el.classList.add('dragging');
+  const sx = e.clientX, sy = e.clientY, ox = n.x, oy = n.y;
+  function onMove(ev) {
+    n.x = ox + (ev.clientX - sx) / scale;
+    n.y = oy + (ev.clientY - sy) / scale;
+    n._el.style.left = n.x + 'px';
+    n._el.style.top  = n.y + 'px';
+    renderEdges();
+  }
+  function onUp() {
+    n._el.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+// ── Interaction: pan ─────────────────────────────────────────────────
+wrap.addEventListener('mousedown', e => {
+  if (e.target.closest('.node')) return;
+  wrap.classList.add('panning');
+  const sx = e.clientX, sy = e.clientY, ox = panX, oy = panY;
+  function onMove(ev) {
+    panX = ox + (ev.clientX - sx);
+    panY = oy + (ev.clientY - sy);
+    applyTransform();
+  }
+  function onUp() {
+    wrap.classList.remove('panning');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+});
+
+// ── Interaction: zoom ────────────────────────────────────────────────
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 1/1.1;
+  const rect = wrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  panX = mx - (mx - panX) * factor;
+  panY = my - (my - panY) * factor;
+  scale = Math.max(0.25, Math.min(3, scale * factor));
+  applyTransform();
+}, { passive: false });
+
+function zoomBy(f) { scale = Math.max(0.25, Math.min(3, scale * f)); applyTransform(); }
+function resetView() { scale = 0.85; panX = -20; panY = -30; applyTransform(); }
+
+// ── Subgraph highlights ─────────────────────────────────────────────
+// Three filters: 🔐 secrets (edges of type 'secret'), 🐙 Argo CD
+// (edges incident to the 'argocd' node), ☸ GKE (everything that runs
+// inside the cluster + intra-cluster edges). Mutually exclusive —
+// turning one on turns the others off. Dimming itself is driven by the
+// body.<mode>-only CSS rules above; this JS just tags participating
+// elements (nodes/edges/groups) with the corresponding marker class.
+
+// Everything that lives inside the GKE cluster. The cluster node itself
+// is included, plus the K8s API server (control plane) and every node
+// positioned inside the system and prodx groups in the canvas layout.
+const GKE_NODE_IDS = new Set([
+  'gke', 'k8s-api',
+  // system namespaces
+  'argocd', 'eso', 'cloudflared',
+  // prodx namespace
+  'svc-web', 'dep-web', 'hpa-web',
+  'svc-api', 'dep-api', 'hpa-api',
+  'postgres', 'redis',
+  'secret-pg', 'es-pg', 'clusterstore',
+]);
+const GKE_GROUP_IDS = new Set(['system', 'prodx']);
+
+let secretsOnly = false;
+let argocdOnly  = false;
+let gkeOnly     = false;
+
+function setFilter(mode /* 'secrets' | 'argocd' | 'gke' | null */) {
+  // Filters and the walkthrough are mutually exclusive — they fight
+  // for the same dim-everything-else CSS state.
+  if (typeof walkStep !== 'undefined' && walkStep != null) exitWalkthrough();
+
+  secretsOnly = (mode === 'secrets');
+  argocdOnly  = (mode === 'argocd');
+  gkeOnly     = (mode === 'gke');
+
+  // Recompute participating-node sets every time, so it stays correct
+  // even if EDGES / NODES are edited later.
+  const secretNodeIds = new Set();
+  const argocdNodeIds = new Set(['argocd']);     // self always included
+  for (const e of EDGES) {
+    if (e.type === 'secret')                     { secretNodeIds.add(e.from); secretNodeIds.add(e.to); }
+    if (e.from === 'argocd' || e.to === 'argocd'){ argocdNodeIds.add(e.from); argocdNodeIds.add(e.to); }
+  }
+  for (const n of NODES) {
+    n._el.classList.toggle('secret-node', secretsOnly && secretNodeIds.has(n.id));
+    n._el.classList.toggle('argocd-node', argocdOnly  && argocdNodeIds.has(n.id));
+    n._el.classList.toggle('gke-node',    gkeOnly     && GKE_NODE_IDS.has(n.id));
+  }
+  for (const g of GROUPS) {
+    g._el.classList.toggle('gke-group', gkeOnly && GKE_GROUP_IDS.has(g.id));
+  }
+
+  // GKE filter: an edge is "in-cluster" if both endpoints are inside
+  // the cluster. Tag the rendered SVG path + its label with .gke-edge
+  // so the body.gke-only CSS rules can pick them up; we use a class
+  // (not data-*) because the membership predicate is set-based, not a
+  // single id, and CSS can't enumerate set membership.
+  const paths  = edgesSvg.querySelectorAll('.edge');
+  const labels = edgesSvg.querySelectorAll('.edge-label');
+  for (const el of [...paths, ...labels]) {
+    const f = el.getAttribute('data-from');
+    const t = el.getAttribute('data-to');
+    const inCluster = gkeOnly && GKE_NODE_IDS.has(f) && GKE_NODE_IDS.has(t);
+    el.classList.toggle('gke-edge', inCluster);
+  }
+
+  document.body.classList.toggle('secrets-only', secretsOnly);
+  document.body.classList.toggle('argocd-only',  argocdOnly);
+  document.body.classList.toggle('gke-only',     gkeOnly);
+  document.getElementById('secrets-toggle').classList.toggle('active', secretsOnly);
+  document.getElementById('argocd-toggle' ).classList.toggle('active', argocdOnly);
+  document.getElementById('gke-toggle'    ).classList.toggle('active', gkeOnly);
+}
+
+function toggleSecretsHighlight() { setFilter(secretsOnly ? null : 'secrets'); }
+function toggleArgocdHighlight()  { setFilter(argocdOnly  ? null : 'argocd');  }
+function toggleGkeHighlight()     { setFilter(gkeOnly     ? null : 'gke');     }
+
+// ── Step-by-step walkthrough ────────────────────────────────────────
+// Each step lists: which directory to cd into, the commands to run,
+// what new nodes/edges show up after that step, and a 1-2 sentence
+// note. setStep(n) makes the diagram show the *cumulative* result of
+// running steps 1..n (so clicking step 5 shows everything that exists
+// after step 5, not just the diff from step 4). Edges are matched by
+// `from→to` pair.
+const STEPS = [
+  {
+    num: 1,
+    title: 'Fork repos + sign in to your tools',
+    where: '(no terraform yet — fork on GitHub, then auth your CLIs)',
+    notes: 'Fork ProdX / ProdXTF / ProdXCD on GitHub and <code>git clone</code> them locally. Then auth your CLIs so Terraform / kubectl / vault can talk to GCP, HCP and Vault. Nothing in the cloud yet — only your forks on GitHub and credentials on your laptop.',
+    commands:
+`# 1. Fork all 3 repos via the GitHub UI, then clone (skip if already cloned):
+git clone https://github.com/<you>/ProdX.git
+git clone https://github.com/<you>/ProdXTF.git
+git clone https://github.com/<you>/ProdXCD.git
+
+# 2. Preflight: check whether you're already signed in from a prior session.
+#    If every line below prints a valid identity / token, skip the login
+#    commands underneath.
+gcloud auth list                              # expect ACTIVE * <your-email>
+gcloud auth application-default print-access-token | head -c 20; echo
+ls ~/.terraform.d/credentials.tfrc.json       # expect file present
+gh auth status                                # expect "Logged in to github.com"
+export VAULT_ADDR=https://vault.pbcv.dev      # Mode A only
+vault token lookup | head -5                  # Mode A only; expect "display_name"
+
+# 3. Google Cloud (used by Terraform AND kubectl)
+gcloud auth login
+gcloud auth application-default login
+
+# 4. HCP Terraform (state backend only — execution=Local)
+terraform login
+
+# 5. GitHub CLI (used by Step 9 to dispatch CI)
+gh auth login
+
+# 6. HashiCorp Vault (Mode A only — skip if use_vault=false)
+vault login`,
+    creates: { nodes: ['laptop', 'github'], edges: [['laptop','github']] },
+  },
+  {
+    num: 2,
+    title: 'HCP Terraform workspaces',
+    where: 'ProdXTF/envs/tfc-bootstrap/',
+    notes: 'Creates the two HCP workspaces (prodx-bootstrap + prodx-dev) with execution_mode=Local so HCP only stores state. State for this folder stays on your laptop.',
+    commands:
+`cd ProdXTF/envs/tfc-bootstrap
+
+# First-time only: copy the example file. SKIP THE cp IF terraform.tfvars
+# already exists with your real values — running cp would wipe them.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars: organization = "<your-hcp-org>"
+
+terraform init
+terraform apply`,
+    creates: { nodes: ['hcp'], edges: [['laptop','hcp']] },
+  },
+  {
+    num: 3,
+    title: 'GCP project + APIs',
+    where: 'ProdXTF/envs/bootstrap/',
+    notes: 'Creates the Google Cloud project and turns on 8 APIs (container, compute, artifactregistry, iam, …). After it succeeds, point gcloud at the new project.',
+    commands:
+`cd ../bootstrap
+
+# First-time only: skip the cp if terraform.tfvars already exists.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars:
+#   billing_account = "01ABCD-234567-89EFGH"
+#   project_id      = "prodx-dev-xxxx"
+#
+# IMPORTANT: every project_id you destroy is reserved by Google for 30
+# days. If you've torn down before, increment the suffix in tfvars
+# (e.g. prodx-dev3 → prodx-dev4) — otherwise apply will fail with
+# "Requested entity already exists". You'll also need to update the
+# same project_id in ../dev/terraform.tfvars and
+# ../vault-bootstrap/terraform.tfvars before their applies.
+
+terraform init
+terraform apply
+
+gcloud config set project $(terraform output -raw project_id)
+gcloud auth application-default set-quota-project $(terraform output -raw project_id)`,
+    creates: { nodes: [], edges: [] },
+  },
+  {
+    num: 4,
+    title: 'Cluster + image registry',
+    where: 'ProdXTF/envs/dev/ — first apply, Stage 1 (~14 min)',
+    notes: 'VPC, GKE cluster (zonal · Spot · e2-medium · 1→3 nodes), Artifact Registry, and the WIF pool + publisher SA. This is the heavy step — the GKE control plane is the slow part.',
+    commands:
+`cd ../dev
+
+# First-time only: skip the cp if terraform.tfvars already exists.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars at least:
+#   project_id (same as Step 3)
+#   cloudflare_api_token, cloudflare_account_id, cloudflare_zone_id, cloudflare_domain
+#   github_repo_owner, github_token
+#   (Mode B: + use_vault=false, postgres_password)
+
+terraform init
+
+# Stage 1 — VPC + cluster + registry/WIF
+terraform apply \\
+  -target=module.network \\
+  -target=module.cluster \\
+  -target=module.registry \\
+  -auto-approve
+
+# Optional progress check from another shell while you wait (~14 min):
+#   gcloud container clusters list --project <project-id>
+#   gcloud artifacts repositories list --project <project-id> --location europe-west3`,
+    creates: {
+      nodes: ['gke', 'gar', 'wif', 'k8s-api'],
+      edges: [['laptop','gke'], ['laptop','hcp']],
+    },
+  },
+  {
+    num: 5,
+    title: 'Argo CD + cloudflared (+ tunnel resource)',
+    where: 'ProdXTF/envs/dev/ — Stage 2 (~5–7 min)',
+    notes: 'In-cluster: Argo CD Helm release + cloudflared connector pods. The cloudflared pod needs a TUNNEL_TOKEN, so Terraform also pulls in the tunnel <i>resource</i> here as a dependency. The tunnel <b>ingress rules</b> and <b>DNS CNAMEs</b> are NOT created yet — they land in Stage 3.',
+    commands:
+`# Stage 2 — Argo CD chart + cloudflared connector
+# (the cloudflare tunnel resource itself is pulled in as a dependency
+#  of module.cloudflared, since cloudflared needs the tunnel token)
+terraform apply \\
+  -target=module.argocd \\
+  -target=module.cloudflared \\
+  -auto-approve`,
+    creates: {
+      nodes: ['argocd', 'cloudflared', 'cf-tunnel', 'cf-edge'],
+      edges: [
+        ['laptop','cf-tunnel'],
+        ['laptop','cloudflared'], ['laptop','k8s-api'],
+        ['cloudflared','cf-tunnel'], ['cf-tunnel','cloudflared'],
+      ],
+    },
+  },
+  {
+    num: 6,
+    title: 'Tunnel routes, Argo Apps, CI variables',
+    where: 'ProdXTF/envs/dev/ — Stage 3 (~1 min)',
+    notes: 'Plants everything left from envs/dev: the Cloudflare tunnel <b>ingress config</b> (3 hostname rules + catch-all 404), the <b>3 proxied DNS CNAMEs</b>, the two <b>Argo CD Application CRs</b> (prodx root + external-secrets) via kubernetes_manifest, and the <b>GitHub Actions repository variables</b> (GCP_*, GAR_*, GKE_*) on the ProdX repo. Mode B skips the external-secrets Application.',
+    commands:
+`# Stage 3 — DNS + ingress + Argo Apps + ci_variables
+terraform apply -auto-approve
+
+# Every later edit (once the env exists) is just:
+terraform apply`,
+    creates: {
+      nodes: ['cf-ingress', 'cf-dns'],
+      edges: [
+        ['laptop','cf-ingress'], ['laptop','cf-dns'],
+        ['cf-ingress','cf-tunnel'], ['cf-dns','cf-tunnel'],
+        ['laptop','github'], ['argocd','github'],
+      ],
+    },
+  },
+  {
+    num: 7,
+    title: 'Wire the cluster ↔ Vault (Mode A only)',
+    where: 'ProdXTF/envs/vault-bootstrap/ — skip entirely in Mode B',
+    notes: 'Mode A only. Creates the vault-auth reviewer SA in-cluster, enables Vault\'s Kubernetes auth method, creates the prodx-eso role + prodx-app-read policy, and seeds initial KV values (postgres / cloudflare / github / cursor). Argo CD then installs ESO from charts.external-secrets.io.',
+    commands:
+`cd ../vault-bootstrap
+
+# Preflight: make sure your Vault token is still valid (it lives in
+# ~/.vault-token and expires; default TTL is ~32 days for userpass).
+export VAULT_ADDR=https://vault.pbcv.dev
+vault token lookup | head -3      # expect a display_name line
+# If it errors with "missing client token", re-run: vault login
+
+# First-time only: skip the cp if terraform.tfvars already exists.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars:
+#   project_id (same as Step 3), postgres_password,
+#   cloudflare_api_token / account_id / zone_id
+
+terraform init
+terraform apply
+
+# Verify the wiring landed correctly:
+vault kv get secret/prodx/postgres
+vault read auth/kubernetes/role/prodx-eso`,
+    creates: {
+      nodes: ['vault', 'eso', 'helm-repo', 'clusterstore', 'es-pg'],
+      edges: [
+        ['laptop','vault'],
+        ['eso','vault'], ['vault','k8s-api'],
+        ['clusterstore','eso'], ['es-pg','eso'],
+        ['eso','secret-pg'], ['secret-pg','postgres'], ['secret-pg','dep-api'],
+        ['argocd','helm-repo'],
+        ['argocd','es-pg'], ['argocd','clusterstore'],
+      ],
+    },
+  },
+  {
+    num: 8,
+    title: 'GitHub branch protection (+ optional CURSOR)',
+    where: 'ProdXTF/envs/github-bootstrap/',
+    notes: 'Locks down all three forks: main is PR-only, no force-push, no delete. Optionally plants the CURSOR Actions secret on ProdX (from secret/prodx/cursor in Vault, or tfvars in Mode B) so pr-review.yml can run.',
+    commands:
+`cd ../github-bootstrap
+
+# First-time only: skip the cp if terraform.tfvars already exists.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars:
+#   github_owner, github_token (+ set_cursor_secret in Mode B)
+
+terraform init
+terraform apply`,
+    creates: {
+      nodes: [],
+      edges: [['laptop','github']],
+    },
+  },
+  {
+    num: 9,
+    title: 'Ship the app — first CI run',
+    where: 'github.com/<you>/ProdX',
+    notes: 'Push to main triggers CI: build the FastAPI + nginx images, scan with Trivy, push to GAR via WIF, kubectl rollout restart. Cursor reviews the PR via cursor-agent → gh pr comment. Argo CD picks up image changes within ~3 min.<br><br><b>Note:</b> ci-all.yml is just a dispatcher — the actual builds happen in ci-backend.yml + ci-frontend.yml. Watch both runs (~2-3 min each) before moving on.',
+    commands:
+`cd ProdX
+git commit --allow-empty -m "ci: trigger first build"
+git push origin main
+
+# Or fire it manually (works from any branch):
+gh workflow run ci-all.yml --ref main --repo <you>/ProdX
+
+# List + watch the runs that get dispatched:
+gh run list --limit 5
+gh run watch <run-id> --exit-status
+
+# Confirm images landed in GAR:
+gcloud artifacts docker images list \\
+  europe-west3-docker.pkg.dev/<project-id>/prodx --include-tags`,
+    creates: {
+      nodes: ['gha', 'cursor', 'dependabot', 'secret-pg'],
+      edges: [
+        ['github','gha'], ['gha','wif'], ['wif','gar'],
+        ['gha','k8s-api'], ['gar','gke'],
+        ['gha','cursor'], ['gha','github'], ['dependabot','github'],
+        ['argocd','secret-pg'],
+      ],
+    },
+  },
+  {
+    num: 10,
+    title: 'Argo CD reconciles the workloads',
+    where: '(automatic — wait ~3 min)',
+    notes: 'Argo CD pulls ProdXCD (and the ESO chart in Mode A), applies all manifests: prodx-web + prodx-api Deployments, their Services and HPAs, the postgres + redis StatefulSets, the postgres-credentials Secret (either materialized by ESO or rendered plain).',
+    commands:
+`# Watch it converge
+$(terraform output -raw get_credentials_command)
+kubectl -n argocd get application prodx
+kubectl -n prodx get pods`,
+    creates: {
+      nodes: [
+        'dep-web', 'dep-api', 'svc-web', 'svc-api',
+        'hpa-web', 'hpa-api', 'postgres', 'redis',
+      ],
+      edges: [
+        ['argocd','dep-web'], ['argocd','dep-api'],
+        ['argocd','postgres'], ['argocd','redis'],
+        ['argocd','hpa-web'], ['argocd','hpa-api'],
+        ['svc-web','dep-web'], ['svc-api','dep-api'],
+        ['dep-web','svc-api'], ['dep-api','postgres'], ['dep-api','redis'],
+        ['hpa-web','dep-web'], ['hpa-api','dep-api'],
+      ],
+    },
+  },
+  {
+    num: 11,
+    title: 'First user request hits the cluster',
+    where: 'https://prodx.<your-domain>',
+    notes: 'A browser visits one of the 3 hostnames. DNS resolves to Cloudflare\'s anycast IPs; TLS terminates at the edge; the request rides the tunnel to cloudflared; cloudflared forwards to the in-cluster Service named in cf-ingress.',
+    commands:
+`# Open in browser (or curl -4 to test from CLI):
+https://prodx.<your-domain>        # the website
+https://prodxapi.<your-domain>     # the API root (404 — no / route)
+https://prodxapi.<your-domain>/api/metrics   # JSON health
+https://argocd.<your-domain>       # Argo CD UI
+
+# Cloudflare DNS can take 30-90 seconds to publish A records after
+# Step 6 creates the CNAMEs. If curl returns "000 / Could not resolve
+# host", wait for IPv4 records to appear first:
+until dig +short A prodx.<your-domain> @1.1.1.1 | grep -q "^[0-9]"; do
+  sleep 10
+done
+
+# WSL-friendly verification (Cloudflare may answer IPv6-first;
+# force IPv4 if your environment can't route IPv6):
+for h in prodx prodxapi argocd; do
+  curl -4 -s -o /dev/null -w "$h: %{http_code}\\n" https://$h.<your-domain>
+done
+
+# Expected: prodx 200, prodxapi 404 (no / route — try /api/metrics),
+# argocd 200. Then fetch the API health payload:
+curl -4 -s https://prodxapi.<your-domain>/api/metrics`,
+    creates: {
+      nodes: ['browser'],
+      edges: [
+        ['browser','cf-dns'], ['cf-dns','cf-edge'], ['browser','cf-edge'],
+        ['cf-edge','cf-tunnel'],
+        ['cloudflared','svc-web'], ['cloudflared','svc-api'], ['cloudflared','argocd'],
+      ],
+    },
+  },
+
+  // ── Teardown sequence (steps 12–16) ─────────────────────────────────
+  // Run in REVERSE dependency order. vault-bootstrap must go first
+  // (its kubernetes_* resources need the cluster still up); the GCP
+  // project goes near the end and locks its project_id for 30 days.
+  // Each destroy step\'s `removes` list mirrors what its create step
+  // (or earlier dependency) added — the walkthrough subtracts those
+  // from the cumulative scope so you can watch the project shrink.
+  {
+    num: 12, kind: 'destroy',
+    title: 'Destroy vault-bootstrap',
+    where: 'ProdXTF/envs/vault-bootstrap/ — Mode A only',
+    notes: 'Removes the Vault auth method config, prodx-eso role, prodx-app-read policy, the 4 KV secrets, and the in-cluster vault-auth reviewer SA / ClusterRoleBinding / Secret. The Vault server itself and the KV mount stay intact (TF didn\'t enable them). Run BEFORE destroying envs/dev — the kubernetes_* resources here need the cluster API to still be reachable.',
+    commands:
+`export VAULT_ADDR=https://vault.pbcv.dev
+cd ProdXTF/envs/vault-bootstrap
+terraform destroy -auto-approve`,
+    removes: {
+      nodes: ['vault', 'eso', 'helm-repo', 'clusterstore', 'es-pg'],
+      edges: [
+        ['laptop','vault'],
+        ['eso','vault'], ['vault','k8s-api'],
+        ['clusterstore','eso'], ['es-pg','eso'],
+        ['eso','secret-pg'],
+        ['argocd','helm-repo'],
+        ['argocd','es-pg'], ['argocd','clusterstore'],
+      ],
+    },
+  },
+  {
+    num: 13, kind: 'destroy',
+    title: 'Destroy dev (cluster + tunnel + Argo Apps)',
+    where: 'ProdXTF/envs/dev/ — ~6 min',
+    notes: 'Tears down the cluster, VPC, Artifact Registry, WIF pool/provider/SA, cloudflared deployment, Cloudflare tunnel/ingress/DNS, and the two Argo Application CRs.<br><br><b>If destroy hangs on "Timed out when waiting for resource prodx to be deleted":</b> the Argo Application has a finalizer that can\'t run after Argo CD itself is gone. Strip the finalizers manually and re-run.',
+    commands:
+`cd ../dev
+terraform destroy -auto-approve
+
+# If the destroy errors out, see what\'s still in state to know which
+# case below applies:
+terraform state list
+
+# A) Stuck on the Argo Application finalizer (only happens BEFORE the
+#    cluster is destroyed)? Strip the finalizer, then re-destroy:
+gcloud container clusters get-credentials \\
+  prodx-dev-gke --zone europe-west3-a --project <project-id>
+kubectl -n argocd patch application prodx \\
+  --type=merge -p '{"metadata":{"finalizers":[]}}'
+kubectl -n argocd patch application external-secrets \\
+  --type=merge -p '{"metadata":{"finalizers":[]}}'
+terraform destroy -auto-approve
+
+# B) Cloudflare tunnel error 1022: "This tunnel has active connections.
+#    Please stop all cloudflared replicas, or wait a few minutes for
+#    connections to close, then try again." The cloudflared pods will
+#    stop reconnecting once their namespace is torn down — give it ~3
+#    minutes then retry:
+sleep 180
+terraform destroy -auto-approve
+
+# C) "Failed to construct REST client" on orphan kubernetes_manifest
+#    resources? Happens once the cluster is gone but those resources
+#    are still in TF state. Drop them from state, then target the
+#    remaining Cloudflare resources directly:
+terraform state rm 'kubernetes_manifest.prodx_root_app' || true
+terraform state rm 'kubernetes_manifest.external_secrets_app[0]' || true
+terraform destroy \\
+  -target=module.cloudflare.cloudflare_zero_trust_tunnel_cloudflared.this \\
+  -target=module.cloudflare.random_id.tunnel_secret \\
+  -auto-approve
+
+# Final check: state should be empty.
+terraform state list   # expect no output`,
+    removes: {
+      nodes: [
+        'gke', 'gar', 'wif', 'k8s-api',
+        'argocd', 'cloudflared',
+        'cf-tunnel', 'cf-ingress', 'cf-dns', 'cf-edge',
+        'dep-web', 'dep-api', 'svc-web', 'svc-api',
+        'hpa-web', 'hpa-api', 'postgres', 'redis', 'secret-pg', 'browser',
+        'gha',  // GitHub Actions has no deploy target once the cluster's gone
+      ],
+      edges: [
+        ['laptop','gke'], ['laptop','k8s-api'],
+        ['laptop','cf-tunnel'], ['laptop','cf-ingress'], ['laptop','cf-dns'],
+        ['laptop','cloudflared'],
+        ['cf-ingress','cf-tunnel'], ['cf-dns','cf-tunnel'],
+        ['cloudflared','cf-tunnel'], ['cf-tunnel','cloudflared'],
+        ['argocd','github'],
+        ['github','gha'],  // webhook trigger has no listener now
+        ['gha','wif'], ['wif','gar'], ['gha','k8s-api'], ['gar','gke'],
+        ['gha','cursor'], ['gha','github'],
+        ['argocd','dep-web'], ['argocd','dep-api'],
+        ['argocd','postgres'], ['argocd','redis'],
+        ['argocd','hpa-web'], ['argocd','hpa-api'],
+        ['argocd','secret-pg'],
+        ['svc-web','dep-web'], ['svc-api','dep-api'],
+        ['dep-web','svc-api'], ['dep-api','postgres'], ['dep-api','redis'],
+        ['hpa-web','dep-web'], ['hpa-api','dep-api'],
+        ['secret-pg','postgres'], ['secret-pg','dep-api'],
+        ['browser','cf-dns'], ['cf-dns','cf-edge'], ['browser','cf-edge'],
+        ['cf-edge','cf-tunnel'],
+        ['cloudflared','svc-web'], ['cloudflared','svc-api'], ['cloudflared','argocd'],
+      ],
+    },
+  },
+  {
+    num: 14, kind: 'destroy',
+    title: 'Destroy github-bootstrap',
+    where: 'ProdXTF/envs/github-bootstrap/',
+    notes: 'Removes branch protection rules on the 3 forks + the CURSOR Actions secret (if it was set). The forks themselves stay — Terraform deliberately uses `data` not `resource` for the repos so destroy can\'t delete them. <code>laptop→github</code> survives (still used for git push).',
+    commands:
+`cd ../github-bootstrap
+terraform destroy -auto-approve`,
+    removes: {
+      nodes: ['dependabot', 'cursor'],
+      edges: [['dependabot','github']],
+    },
+  },
+  {
+    num: 15, kind: 'destroy',
+    title: 'Destroy bootstrap (GCP project)',
+    where: 'ProdXTF/envs/bootstrap/ — ⚠ 30-day project_id lock',
+    notes: '<b>⚠ Locks the project_id for 30 days.</b> Google puts the project into DELETE_REQUESTED — you can\'t reuse the same project_id during that window. Plan ahead: if you\'ll rebuild within 30 days, increment the id (prodx-devN → prodx-devN+1) in <code>envs/bootstrap/terraform.tfvars</code>, <code>envs/dev/terraform.tfvars</code>, and <code>envs/vault-bootstrap/terraform.tfvars</code>.',
+    commands:
+`cd ../bootstrap
+terraform destroy -auto-approve`,
+    removes: { nodes: [], edges: [] },
+  },
+  {
+    num: 16, kind: 'destroy',
+    title: 'Destroy tfc-bootstrap (HCP workspaces)',
+    where: 'ProdXTF/envs/tfc-bootstrap/',
+    notes: 'Deletes the two HCP workspaces (prodx-bootstrap, prodx-dev). The HCP org and your terraform login token stay. Run last — every other env stored its state in these workspaces.',
+    commands:
+`cd ../tfc-bootstrap
+terraform destroy -auto-approve`,
+    removes: {
+      nodes: ['hcp', 'github', 'laptop'],
+      edges: [
+        ['laptop','github'], ['laptop','hcp'],
+      ],
+    },
+  },
+];
+
+// Currently-active step number (1-based) or null when not walking.
+let walkStep = null;
+
+// Compute the cumulative scope (nodes + edges that exist by step n).
+// Create steps add to the set; destroy steps subtract from it. The
+// destroy steps live *after* the create steps in STEPS, so a single
+// left-to-right pass produces the correct "state after step n" view.
+function walkScope(n) {
+  const nodes = new Set();
+  const edges = new Set();
+  for (let i = 0; i < n && i < STEPS.length; i++) {
+    const s = STEPS[i];
+    if (s.kind === 'destroy') {
+      for (const id of (s.removes && s.removes.nodes) || []) nodes.delete(id);
+      for (const [f, t] of (s.removes && s.removes.edges) || []) edges.delete(f + '→' + t);
+    } else {
+      for (const id of s.creates.nodes) nodes.add(id);
+      for (const [f, t] of s.creates.edges) edges.add(f + '→' + t);
+    }
+  }
+  return { nodes, edges };
+}
+
+function setStep(n) {
+  // Activating a step clears the secrets/argocd/gke filters.
+  if (secretsOnly || argocdOnly || gkeOnly) setFilter(null);
+
+  walkStep = n;
+  const step = STEPS[n - 1];
+  const isDestroy = step.kind === 'destroy';
+  document.body.classList.add('walking');
+  document.body.classList.toggle('walking-destroy', isDestroy);
+
+  const { nodes, edges } = walkScope(n);
+  for (const node of NODES) {
+    node._el.classList.toggle('walk-on', nodes.has(node.id));
+  }
+  applyEdgeWalkClasses(edges);
+  applyGroupWalkClasses(nodes);
+
+  // Update chip strip styling: chips 1..n-1 = done, chip n = current.
+  for (const chip of document.querySelectorAll('.step-chip')) {
+    const k = +chip.dataset.step;
+    chip.classList.toggle('done',    k < n);
+    chip.classList.toggle('current', k === n);
+  }
+
+  // Fill the side panel with the step's text.
+  document.getElementById('walk-num').textContent      = step.num;
+  document.getElementById('walk-title').textContent    = step.title;
+  document.getElementById('walk-where').textContent    = step.where;
+  document.getElementById('walk-notes').innerHTML      = step.notes;
+  document.getElementById('walk-commands').textContent = step.commands;
+  document.getElementById('walk-progress').textContent = `${n} / ${STEPS.length}`;
+  document.getElementById('walk-prev').disabled = (n === 1);
+  document.getElementById('walk-next').disabled = (n === STEPS.length);
+
+  const creates = document.getElementById('walk-creates');
+  const changeList = isDestroy
+    ? (step.removes && step.removes.nodes) || []
+    : (step.creates && step.creates.nodes) || [];
+  const verb = isDestroy ? 'Removes' : 'Creates';
+  if (changeList.length === 0) {
+    creates.innerHTML = `<b>${verb}:</b> no node-level change (state / repo settings only)`;
+  } else {
+    creates.innerHTML = `<b>${verb}:</b> ` + changeList.join(' · ');
+  }
+}
+
+// Tag rendered edges + labels with .walk-on based on the current step.
+// Pulled out so renderEdges() can re-apply after a node drag.
+function applyEdgeWalkClasses(edgeSet) {
+  for (const el of edgesSvg.querySelectorAll('.edge, .edge-label')) {
+    const key = el.getAttribute('data-from') + '→' + el.getAttribute('data-to');
+    el.classList.toggle('walk-on', edgeSet.has(key));
+  }
+}
+function applyGroupWalkClasses(nodeSet) {
+  // A group lights up if any of its known members are in the active set.
+  // The mapping is hard-coded because GROUPS doesn't list members.
+  const groupMembers = {
+    dev:        ['cursor','laptop','dependabot','github','gha','hcp'],
+    gcp:        ['wif','gar','gke'],
+    system:     ['k8s-api','argocd','eso','cloudflared'],
+    prodx:      ['svc-web','dep-web','hpa-web','svc-api','dep-api','hpa-api',
+                 'postgres','redis','secret-pg','es-pg','clusterstore'],
+    saas:       ['helm-repo','vault'],
+    cloudflare: ['cf-tunnel','cf-ingress','cf-edge','cf-dns'],
+    user:       ['browser'],
+  };
+  for (const g of GROUPS) {
+    const members = groupMembers[g.id] || [];
+    const anyActive = members.some(id => nodeSet.has(id));
+    g._el.classList.toggle('walk-group', anyActive);
+  }
+}
+
+function nextStep() { if (walkStep != null && walkStep < STEPS.length) setStep(walkStep + 1); }
+function prevStep() { if (walkStep != null && walkStep > 1)              setStep(walkStep - 1); }
+function exitWalkthrough() {
+  walkStep = null;
+  document.body.classList.remove('walking', 'walking-destroy');
+  for (const n of NODES)  n._el.classList.remove('walk-on');
+  for (const g of GROUPS) g._el.classList.remove('walk-group');
+  for (const el of edgesSvg.querySelectorAll('.edge, .edge-label')) el.classList.remove('walk-on');
+  for (const chip of document.querySelectorAll('.step-chip')) chip.classList.remove('done', 'current');
+}
+
+function renderStepStrip() {
+  const strip = document.getElementById('steps-strip');
+  let lastKind = null;
+  for (const s of STEPS) {
+    const kind = s.kind || 'create';
+    // Insert a thin divider + "Destroy" label between the build chips
+    // and the teardown chips so the two sequences are visually distinct.
+    if (kind !== lastKind && lastKind !== null) {
+      const div = document.createElement('span');
+      div.className = 'divider';
+      strip.appendChild(div);
+      const lbl = document.createElement('span');
+      lbl.className = 'label destroy';
+      lbl.textContent = 'Destroy';
+      strip.appendChild(lbl);
+    }
+    const chip = document.createElement('div');
+    chip.className = 'step-chip' + (kind === 'destroy' ? ' destroy' : '');
+    chip.textContent = s.num;
+    chip.title = `Step ${s.num}: ${s.title}`;
+    chip.dataset.step = s.num;
+    chip.addEventListener('click', () => setStep(s.num));
+    strip.appendChild(chip);
+    lastKind = kind;
+  }
+  const exit = document.createElement('button');
+  exit.className = 'exit';
+  exit.textContent = 'Exit';
+  exit.onclick = exitWalkthrough;
+  strip.appendChild(exit);
+}
+
+// ── Tooltip ──────────────────────────────────────────────────────────
+function showTip(e, n) {
+  tooltip.innerHTML = `<strong>${n.label}</strong><br>${n.tip || n.desc}`;
+  tooltip.style.display = 'block';
+  moveTip(e);
+}
+function moveTip(e) {
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY + 14) + 'px';
+}
+function hideTip() { tooltip.style.display = 'none'; }
+
+// ── Auto-layout (reset node positions) ───────────────────────────────
+const INITIAL = NODES.map(n => ({ id: n.id, x: n.x, y: n.y }));
+function autoLayout() {
+  for (const init of INITIAL) {
+    const n = nodeById[init.id];
+    n.x = init.x; n.y = init.y;
+    n._el.style.left = n.x + 'px';
+    n._el.style.top  = n.y + 'px';
+  }
+  renderEdges();
+  resetView();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
+renderGroups();
+renderNodes();
+renderStepStrip();
+requestAnimationFrame(renderEdges); // wait one frame so offsetWidth is correct
+applyTransform();
+</script>
+
+</body>
+</html>
