@@ -950,6 +950,23 @@ terraform state list</pre>
   </div>
 </div>
 
+<div class="note warn">
+  <span class="lbl">If the dev destroy stalls on the Cloudflare tunnel</span>
+  Right after the cluster goes away, Cloudflare can still see the tunnel as
+  "active" for a few minutes (its edge hasn't noticed the cloudflared pods
+  are gone). Wait ~3 minutes and re-run <code>terraform destroy</code>. If
+  Terraform also reports <code>"Failed to construct REST client"</code> for
+  orphan <code>kubernetes_manifest</code> resources, target the cloudflare
+  resources directly:
+  <div class="code" style="margin-top:.5rem;">
+  <button class="copy">Copy</button>
+  <pre>terraform destroy \
+  -target=module.cloudflare.cloudflare_zero_trust_tunnel_cloudflared.this \
+  -target=module.cloudflare.random_id.tunnel_secret \
+  -auto-approve</pre>
+  </div>
+</div>
+
 <div class="note danger">
   <span class="lbl">The 30-day rule — important</span>
   When you destroy <code>bootstrap</code>, Google deletes the project but <b>reserves its ID
