@@ -831,20 +831,32 @@ const STEPS = [
     where: '(no terraform yet — fork on GitHub, then auth your CLIs)',
     notes: 'Fork ProdX / ProdXTF / ProdXCD on GitHub and <code>git clone</code> them locally. Then auth your CLIs so Terraform / kubectl / vault can talk to GCP, HCP and Vault. Nothing in the cloud yet — only your forks on GitHub and credentials on your laptop.',
     commands:
-`# 1. Fork all 3 repos via the GitHub UI, then clone:
+`# 1. Fork all 3 repos via the GitHub UI, then clone (skip if already cloned):
 git clone https://github.com/<you>/ProdX.git
 git clone https://github.com/<you>/ProdXTF.git
 git clone https://github.com/<you>/ProdXCD.git
 
-# 2. Google Cloud (used by Terraform AND kubectl)
+# 2. Preflight: check whether you're already signed in from a prior session.
+#    If every line below prints a valid identity / token, skip the login
+#    commands underneath.
+gcloud auth list                              # expect ACTIVE * <your-email>
+gcloud auth application-default print-access-token | head -c 20; echo
+ls ~/.terraform.d/credentials.tfrc.json       # expect file present
+gh auth status                                # expect "Logged in to github.com"
+export VAULT_ADDR=https://vault.pbcv.dev      # Mode A only
+vault token lookup | head -5                  # Mode A only; expect "display_name"
+
+# 3. Google Cloud (used by Terraform AND kubectl)
 gcloud auth login
 gcloud auth application-default login
 
-# 3. HCP Terraform (state backend only — execution=Local)
+# 4. HCP Terraform (state backend only — execution=Local)
 terraform login
 
-# 4. HashiCorp Vault (Mode A only — skip if use_vault=false)
-export VAULT_ADDR=https://vault.pbcv.dev
+# 5. GitHub CLI (used by Step 9 to dispatch CI)
+gh auth login
+
+# 6. HashiCorp Vault (Mode A only — skip if use_vault=false)
 vault login`,
     creates: { nodes: ['laptop', 'github'], edges: [['laptop','github']] },
   },
@@ -855,8 +867,12 @@ vault login`,
     notes: 'Creates the two HCP workspaces (prodx-bootstrap + prodx-dev) with execution_mode=Local so HCP only stores state. State for this folder stays on your laptop.',
     commands:
 `cd ProdXTF/envs/tfc-bootstrap
-cp terraform.tfvars.example terraform.tfvars
-# edit: organization = "<your-hcp-org>"
+
+# First-time only: copy the example file. SKIP THE cp IF terraform.tfvars
+# already exists with your real values — running cp would wipe them.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars: organization = "<your-hcp-org>"
+
 terraform init
 terraform apply`,
     creates: { nodes: ['hcp'], edges: [['laptop','hcp']] },
@@ -868,10 +884,20 @@ terraform apply`,
     notes: 'Creates the Google Cloud project and turns on 8 APIs (container, compute, artifactregistry, iam, …). After it succeeds, point gcloud at the new project.',
     commands:
 `cd ../bootstrap
-cp terraform.tfvars.example terraform.tfvars
-# edit:
+
+# First-time only: skip the cp if terraform.tfvars already exists.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars:
 #   billing_account = "01ABCD-234567-89EFGH"
 #   project_id      = "prodx-dev-xxxx"
+#
+# IMPORTANT: every project_id you destroy is reserved by Google for 30
+# days. If you've torn down before, increment the suffix in tfvars
+# (e.g. prodx-dev3 → prodx-dev4) — otherwise apply will fail with
+# "Requested entity already exists". You'll also need to update the
+# same project_id in ../dev/terraform.tfvars and
+# ../vault-bootstrap/terraform.tfvars before their applies.
+
 terraform init
 terraform apply
 
@@ -886,10 +912,15 @@ gcloud auth application-default set-quota-project $(terraform output -raw projec
     notes: 'VPC, GKE cluster (zonal · Spot · e2-medium · 1→3 nodes), Artifact Registry, and the WIF pool + publisher SA. This is the heavy step — the GKE control plane is the slow part.',
     commands:
 `cd ../dev
-cp terraform.tfvars.example terraform.tfvars
-# edit at least:
-#   project_id, cloudflare_*, github_repo_owner
+
+# First-time only: skip the cp if terraform.tfvars already exists.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars at least:
+#   project_id (same as Step 3)
+#   cloudflare_api_token, cloudflare_account_id, cloudflare_zone_id, cloudflare_domain
+#   github_repo_owner, github_token
 #   (Mode B: + use_vault=false, postgres_password)
+
 terraform init
 
 # Stage 1 — VPC + cluster + registry/WIF
@@ -897,7 +928,11 @@ terraform apply \\
   -target=module.network \\
   -target=module.cluster \\
   -target=module.registry \\
-  -auto-approve`,
+  -auto-approve
+
+# Optional progress check from another shell while you wait (~14 min):
+#   gcloud container clusters list --project <project-id>
+#   gcloud artifacts repositories list --project <project-id> --location europe-west3`,
     creates: {
       nodes: ['gke', 'gar', 'wif', 'k8s-api'],
       edges: [['laptop','gke'], ['laptop','hcp']],
@@ -952,14 +987,23 @@ terraform apply`,
     notes: 'Mode A only. Creates the vault-auth reviewer SA in-cluster, enables Vault\'s Kubernetes auth method, creates the prodx-eso role + prodx-app-read policy, and seeds initial KV values (postgres / cloudflare / github / cursor). Argo CD then installs ESO from charts.external-secrets.io.',
     commands:
 `cd ../vault-bootstrap
-cp terraform.tfvars.example terraform.tfvars
-# edit:
-#   project_id, postgres_password,
+
+# Preflight: make sure your Vault token is still valid (it lives in
+# ~/.vault-token and expires; default TTL is ~32 days for userpass).
+export VAULT_ADDR=https://vault.pbcv.dev
+vault token lookup | head -3      # expect a display_name line
+# If it errors with "missing client token", re-run: vault login
+
+# First-time only: skip the cp if terraform.tfvars already exists.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars:
+#   project_id (same as Step 3), postgres_password,
 #   cloudflare_api_token / account_id / zone_id
+
 terraform init
 terraform apply
 
-# Verify:
+# Verify the wiring landed correctly:
 vault kv get secret/prodx/postgres
 vault read auth/kubernetes/role/prodx-eso`,
     creates: {
@@ -981,9 +1025,12 @@ vault read auth/kubernetes/role/prodx-eso`,
     notes: 'Locks down all three forks: main is PR-only, no force-push, no delete. Optionally plants the CURSOR Actions secret on ProdX (from secret/prodx/cursor in Vault, or tfvars in Mode B) so pr-review.yml can run.',
     commands:
 `cd ../github-bootstrap
-cp terraform.tfvars.example terraform.tfvars
-# edit:
+
+# First-time only: skip the cp if terraform.tfvars already exists.
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars:
 #   github_owner, github_token (+ set_cursor_secret in Mode B)
+
 terraform init
 terraform apply`,
     creates: {
@@ -1058,11 +1105,22 @@ https://prodxapi.<your-domain>     # the API root (404 — no / route)
 https://prodxapi.<your-domain>/api/metrics   # JSON health
 https://argocd.<your-domain>       # Argo CD UI
 
+# Cloudflare DNS can take 30-90 seconds to publish A records after
+# Step 6 creates the CNAMEs. If curl returns "000 / Could not resolve
+# host", wait for IPv4 records to appear first:
+until dig +short A prodx.<your-domain> @1.1.1.1 | grep -q "^[0-9]"; do
+  sleep 10
+done
+
 # WSL-friendly verification (Cloudflare may answer IPv6-first;
 # force IPv4 if your environment can't route IPv6):
 for h in prodx prodxapi argocd; do
   curl -4 -s -o /dev/null -w "$h: %{http_code}\\n" https://$h.<your-domain>
-done`,
+done
+
+# Expected: prodx 200, prodxapi 404 (no / route — try /api/metrics),
+# argocd 200. Then fetch the API health payload:
+curl -4 -s https://prodxapi.<your-domain>/api/metrics`,
     creates: {
       nodes: ['browser'],
       edges: [
@@ -1110,7 +1168,12 @@ terraform destroy -auto-approve`,
 `cd ../dev
 terraform destroy -auto-approve
 
-# Stuck on the Argo Application finalizer? Run these, then re-destroy:
+# If the destroy errors out, see what\'s still in state to know which
+# case below applies:
+terraform state list
+
+# A) Stuck on the Argo Application finalizer (only happens BEFORE the
+#    cluster is destroyed)? Strip the finalizer, then re-destroy:
 gcloud container clusters get-credentials \\
   prodx-dev-gke --zone europe-west3-a --project <project-id>
 kubectl -n argocd patch application prodx \\
@@ -1119,8 +1182,27 @@ kubectl -n argocd patch application external-secrets \\
   --type=merge -p '{"metadata":{"finalizers":[]}}'
 terraform destroy -auto-approve
 
-# Cloudflare tunnel sometimes lingers as "active" for ~3 min after
-# pods die — wait, then re-run destroy if it complains.`,
+# B) Cloudflare tunnel error 1022: "This tunnel has active connections.
+#    Please stop all cloudflared replicas, or wait a few minutes for
+#    connections to close, then try again." The cloudflared pods will
+#    stop reconnecting once their namespace is torn down — give it ~3
+#    minutes then retry:
+sleep 180
+terraform destroy -auto-approve
+
+# C) "Failed to construct REST client" on orphan kubernetes_manifest
+#    resources? Happens once the cluster is gone but those resources
+#    are still in TF state. Drop them from state, then target the
+#    remaining Cloudflare resources directly:
+terraform state rm 'kubernetes_manifest.prodx_root_app' || true
+terraform state rm 'kubernetes_manifest.external_secrets_app[0]' || true
+terraform destroy \\
+  -target=module.cloudflare.cloudflare_zero_trust_tunnel_cloudflared.this \\
+  -target=module.cloudflare.random_id.tunnel_secret \\
+  -auto-approve
+
+# Final check: state should be empty.
+terraform state list   # expect no output`,
     removes: {
       nodes: [
         'gke', 'gar', 'wif', 'k8s-api',

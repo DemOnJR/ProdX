@@ -300,13 +300,14 @@ winget install Google.CloudSDK
 winget install Kubernetes.kubectl
 winget install Helm.Helm
 winget install HashiCorp.Vault
+winget install GitHub.cli
 gcloud components install gke-gcloud-auth-plugin</pre>
 </div>
 
 <h3>macOS (with Homebrew)</h3>
 <div class="code">
 <button class="copy">Copy</button>
-<pre>brew install terraform kubectl helm vault
+<pre>brew install terraform kubectl helm vault gh
 brew install --cask google-cloud-sdk
 gcloud components install gke-gcloud-auth-plugin</pre>
 </div>
@@ -314,11 +315,13 @@ gcloud components install gke-gcloud-auth-plugin</pre>
 <h3>Linux / WSL (Ubuntu or Debian)</h3>
 <div class="code">
 <button class="copy">Copy</button>
-<pre><span class="c"># Terraform + Vault (from HashiCorp's package repo)</span>
+<pre><span class="c"># Terraform + Vault + gh (from HashiCorp + GitHub package repos)</span>
 curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp.gpg
 echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list
 sudo apt-get update
-sudo apt-get install -y terraform vault
+sudo apt-get install -y terraform vault gh
 
 <span class="c"># Then install gcloud, kubectl and helm from their official guides:</span>
 <span class="c">#   https://cloud.google.com/sdk/docs/install</span>
@@ -333,7 +336,8 @@ gcloud components install gke-gcloud-auth-plugin</pre>
 <pre>terraform version
 gcloud version
 kubectl version --client
-vault version</pre>
+vault version
+gh --version</pre>
 </div>
 
 <!-- ============================================================= -->
@@ -365,6 +369,21 @@ git clone https://github.com/YOUR-GITHUB-USERNAME/ProdXCD.git</pre>
 <p>These commands connect the tools on your computer to your cloud accounts.
 Each one opens a browser window — approve it and come back to the terminal.</p>
 
+<div class="note tip">
+  <span class="lbl">Already signed in? Run a quick preflight</span>
+  If you've done this before in another session, skip ahead by running these
+  checks. If each line prints a valid identity / token, skip the login commands below.
+  <div class="code" style="margin-top:.5rem;">
+  <button class="copy">Copy</button>
+  <pre>gcloud auth list                       <span class="c"># expect ACTIVE * &lt;your-email&gt;</span>
+gcloud auth application-default print-access-token | head -c 20; echo
+ls ~/.terraform.d/credentials.tfrc.json   <span class="c"># expect file present</span>
+gh auth status                             <span class="c"># expect "Logged in to github.com"</span>
+export VAULT_ADDR=https://vault.pbcv.dev   <span class="c"># Mode A only</span>
+vault token lookup | head -3              <span class="c"># Mode A only; expect display_name line</span></pre>
+  </div>
+</div>
+
 <h3>Google Cloud</h3>
 <div class="code">
 <button class="copy">Copy</button>
@@ -384,6 +403,14 @@ gcloud auth application-default login</pre>
 </div>
 <p>Type <code>yes</code>, approve in the browser. This saves a token so Terraform can store
 its state safely online.</p>
+
+<h3>GitHub CLI</h3>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>gh auth login</pre>
+</div>
+<p>Approve in the browser. Needed by <b>Step 8.6</b> to dispatch the CI workflow
+(<code>gh workflow run</code>) and watch its progress (<code>gh run watch</code>).</p>
 
 <h3>HashiCorp Vault <span class="pill" style="background:#fef3c7;color:#92400e;">Mode A only</span></h3>
 <p><b>Skip this section if you're running in Mode B</b> (no Vault). For Mode A:</p>
@@ -521,6 +548,19 @@ git-ignored) so your keys never end up on GitHub.</p>
   Terraform then builds the cloud resources for you.
 </div>
 
+<div class="note warn">
+  <span class="lbl">Rebuilding? Don't overwrite your tfvars</span>
+  If you've torn down and you're rebuilding, your <code>terraform.tfvars</code> files
+  already exist with real values. Running <code>cp terraform.tfvars.example terraform.tfvars</code>
+  again would wipe them. Use this safe form instead — it copies the example only when
+  no real file is there:
+  <div class="code" style="margin-top:.5rem;">
+  <button class="copy">Copy</button>
+  <pre>[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars</pre>
+  </div>
+  Each <code>cp</code> line below in steps 8.1 – 8.5 can be replaced with this guarded form.
+</div>
+
 <h3>8.1 — tfc-bootstrap</h3>
 <div class="code">
 <button class="copy">Copy</button>
@@ -612,7 +652,13 @@ Make sure you ran <code>vault login</code> (Step 5) first.</p>
 <div class="code">
 <button class="copy">Copy</button>
 <pre>cd ../vault-bootstrap
-cp terraform.tfvars.example terraform.tfvars
+
+<span class="c"># Preflight: confirm your Vault token is still valid (default TTL ~32 days).</span>
+<span class="c"># If it errors with "missing client token", re-run: vault login</span>
+export VAULT_ADDR=https://vault.pbcv.dev
+vault token lookup | head -3
+
+[ -f terraform.tfvars ] || cp terraform.tfvars.example terraform.tfvars
 <span class="c"># edit terraform.tfvars:</span>
 <span class="c">#   project_id            = "YOUR-PROJECT-ID"</span>
 <span class="c">#   cluster_name          = "prodx-dev-gke"   (leave as-is)</span>
@@ -621,7 +667,11 @@ cp terraform.tfvars.example terraform.tfvars
 <span class="c">#   cloudflare_account_id = "YOUR-CLOUDFLARE-ACCOUNT-ID"</span>
 <span class="c">#   cloudflare_zone_id    = "YOUR-CLOUDFLARE-ZONE-ID"</span>
 terraform init
-terraform apply</pre>
+terraform apply
+
+<span class="c"># Verify the wiring landed correctly:</span>
+vault kv get secret/prodx/postgres
+vault read auth/kubernetes/role/prodx-eso</pre>
 </div>
 
 <h3>8.5 — github-bootstrap (lock down the repos)</h3>
@@ -654,8 +704,22 @@ from the Actions tab — or with the <code>gh</code> CLI:</p>
 <button class="copy">Copy</button>
 <pre>gh workflow run ci-all.yml --ref main --repo YOUR-GITHUB-USERNAME/ProdX</pre>
 </div>
-<p>Watch it run in your ProdX repo on GitHub → <b>Actions</b> tab. When it finishes, it has
-built the website and API images and shipped them to the cluster. Argo CD then deploys them.</p>
+<p>Watch it from the terminal — <code>ci-all.yml</code> is just a dispatcher, the real
+builds happen in <code>ci-backend.yml</code> and <code>ci-frontend.yml</code> (each ~2-3 min):</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre><span class="c"># List the runs that just got dispatched</span>
+gh run list --limit 5
+
+<span class="c"># Watch each run until it finishes (blocks the terminal)</span>
+gh run watch RUN-ID --exit-status
+
+<span class="c"># Confirm both images landed in Artifact Registry</span>
+gcloud artifacts docker images list \
+  europe-west3-docker.pkg.dev/YOUR-PROJECT-ID/prodx --include-tags</pre>
+</div>
+<p>When both pipelines finish, the website and API images are in Artifact Registry and
+Argo CD picks them up on its next sync (~3 min).</p>
 
 <div class="note info">
   <span class="lbl">How the pieces find each other</span>
@@ -690,6 +754,23 @@ kubectl -n argocd get application prodx</pre>
   <li><code>https://prodxapi.YOUR-DOMAIN/api/metrics</code> — the API (returns some JSON)</li>
   <li><code>https://argocd.YOUR-DOMAIN</code> — the Argo CD dashboard</li>
 </ul>
+
+<p>Or check from the terminal — Cloudflare DNS can take 30-90s after the first apply,
+so wait for IPv4 records before testing:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre><span class="c"># Wait for A records to publish (skip if dig already returns IPv4)</span>
+until dig +short A prodx.YOUR-DOMAIN @1.1.1.1 | grep -q "^[0-9]"; do sleep 10; done
+
+<span class="c"># WSL/IPv6-blocked? -4 forces IPv4. Expect: prodx 200, prodxapi 404 (no /</span>
+<span class="c"># route — try /api/metrics for the JSON), argocd 200.</span>
+for h in prodx prodxapi argocd; do
+  curl -4 -s -o /dev/null -w "$h: %{http_code}\n" https://$h.YOUR-DOMAIN
+done
+
+<span class="c"># Fetch the API health payload</span>
+curl -4 -s https://prodxapi.YOUR-DOMAIN/api/metrics</pre>
+</div>
 
 <div class="note tip">
   <span class="lbl">Give it a minute</span>
@@ -796,41 +877,76 @@ the build order: <code>vault-bootstrap</code> goes first because its
 <button class="copy">Copy</button>
 <pre><span class="c"># 1. The Vault wiring + secrets (Mode A only — skip in Mode B)</span>
 <span class="c">#    Needs the cluster still up.</span>
+export VAULT_ADDR=https://vault.pbcv.dev
 cd ProdXTF/envs/vault-bootstrap
-terraform destroy
+terraform destroy -auto-approve
 
 <span class="c"># 2. The cluster and everything on it  (~6 min)</span>
 cd ../dev
-terraform destroy
+terraform destroy -auto-approve
 
 <span class="c"># 3. The GitHub branch-protection rules</span>
 cd ../github-bootstrap
-terraform destroy
+terraform destroy -auto-approve
 
 <span class="c"># 4. The Google Cloud project itself</span>
 cd ../bootstrap
-terraform destroy
+terraform destroy -auto-approve
 
 <span class="c"># 5. The HCP Terraform save slots</span>
 cd ../tfc-bootstrap
-terraform destroy</pre>
+terraform destroy -auto-approve</pre>
 </div>
-<p>Type <code>yes</code> at each prompt.</p>
+
+<p>The <code>dev</code> destroy (step 2 above) is where things most often get stuck. If
+yours errors out, run <code>terraform state list</code> to see what's still in state, then
+apply whichever of these cases matches:</p>
 
 <div class="note warn">
-  <span class="lbl">If the dev destroy stalls on the Cloudflare tunnel</span>
-  Right after the cluster goes away, Cloudflare can still see the tunnel as
-  "active" for a few minutes (its edge hasn't noticed the cloudflared pods
-  are gone). Wait ~3 minutes and re-run <code>terraform destroy</code>. If
-  Terraform also reports <code>"Failed to construct REST client"</code> for
-  orphan <code>kubernetes_manifest</code> resources, target the cloudflare
-  resources directly:
+  <span class="lbl">Case A — stuck on the Argo Application finalizer</span>
+  Symptom: <code>"Timed out when waiting for resource prodx to be deleted"</code>. The
+  finalizer is waiting for Argo CD to garbage-collect, but Argo CD is itself being
+  destroyed. Strip the finalizers and re-run:
   <div class="code" style="margin-top:.5rem;">
   <button class="copy">Copy</button>
-  <pre>terraform destroy \
+  <pre>gcloud container clusters get-credentials prodx-dev-gke \
+  --zone europe-west3-a --project YOUR-PROJECT-ID
+kubectl -n argocd patch application prodx \
+  --type=merge -p '{"metadata":{"finalizers":[]}}'
+kubectl -n argocd patch application external-secrets \
+  --type=merge -p '{"metadata":{"finalizers":[]}}'
+terraform destroy -auto-approve</pre>
+  </div>
+</div>
+
+<div class="note warn">
+  <span class="lbl">Case B — Cloudflare tunnel still "active"</span>
+  Symptom: <code>error 1022: "This tunnel has active connections. Please stop all
+  cloudflared replicas, or wait a few minutes for connections to close, then try again."</code>
+  The cloudflared pods stop reconnecting once their namespace is gone, but Cloudflare's
+  edge takes a couple of minutes to notice. Sleep + retry:
+  <div class="code" style="margin-top:.5rem;">
+  <button class="copy">Copy</button>
+  <pre>sleep 180
+terraform destroy -auto-approve</pre>
+  </div>
+</div>
+
+<div class="note warn">
+  <span class="lbl">Case C — "Failed to construct REST client"</span>
+  Symptom: orphan <code>kubernetes_manifest</code> resources can't be destroyed because the
+  cluster is already gone. Drop them from state, then destroy just the Cloudflare pieces:
+  <div class="code" style="margin-top:.5rem;">
+  <button class="copy">Copy</button>
+  <pre>terraform state rm 'kubernetes_manifest.prodx_root_app' || true
+terraform state rm 'kubernetes_manifest.external_secrets_app[0]' || true
+terraform destroy \
   -target=module.cloudflare.cloudflare_zero_trust_tunnel_cloudflared.this \
   -target=module.cloudflare.random_id.tunnel_secret \
-  -auto-approve</pre>
+  -auto-approve
+
+<span class="c"># Sanity: state should be empty</span>
+terraform state list</pre>
   </div>
 </div>
 
@@ -839,6 +955,8 @@ terraform destroy</pre>
   When you destroy <code>bootstrap</code>, Google deletes the project but <b>reserves its ID
   for 30 days</b> — you cannot reuse the same <code>project_id</code> during that time.
   If you rebuild within a month, pick a <b>new</b> project ID (e.g. add a number).
+  <b>Update the same project_id in three tfvars files</b> before rebuilding:
+  <code>envs/bootstrap</code>, <code>envs/dev</code>, <code>envs/vault-bootstrap</code>.
   This is why pausing with just Step 11 — which keeps the project — is the better
   "switch off" most of the time.
 </div>

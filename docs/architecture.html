@@ -164,6 +164,7 @@
   <div class="grp">Reasoning</div>
   <a href="#security">22 · Security at maximum</a>
   <a href="#why">23 · Why each tool</a>
+  <a href="#lifecycle">23.5 · Teardown &amp; rebuild lifecycle</a>
   <a href="#cheat">24 · TL;DR cheat sheet</a>
 </nav>
 
@@ -783,6 +784,71 @@ does the <b>pull</b>.</p>
   <tr><td>Trivy in CI</td><td>Image-registry scanning</td><td>Catches CVEs <i>before</i> the image lands in the registry, blocks the PR.</td></tr>
   <tr><td>Dependabot</td><td>Manual quarterly upgrades</td><td>PRs are continuous; CI proves each one is safe.</td></tr>
 </table>
+
+<!-- ============================================================= -->
+<h2 id="lifecycle">23.5 · Teardown &amp; rebuild lifecycle</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-iac">IaC</span></div>
+  <p><b>Destroy order is the reverse of build, with one caveat:</b> <code>vault-bootstrap</code>
+  goes first (not last), because its in-cluster <code>kubernetes_*</code> resources need the
+  cluster API to still be reachable. The full canonical order:</p>
+  <pre class="flow">1. envs/vault-bootstrap   (Mode A only — needs cluster up)
+2. envs/dev               (cluster, GAR, tunnel, Argo Apps — ~6 min)
+3. envs/github-bootstrap  (branch protection + optional CURSOR)
+4. envs/bootstrap         (the GCP project itself)
+5. envs/tfc-bootstrap     (HCP workspaces — run last)</pre>
+
+  <p><b>Three failure modes you'll likely hit during step 2 (envs/dev destroy)</b> — the
+  <a href="index.html#destroy">setup guide</a> has the exact recovery commands. Short version:</p>
+  <table>
+    <tr><th>Symptom</th><th>Cause</th><th>Recovery</th></tr>
+    <tr>
+      <td><code>"Timed out when waiting for resource prodx to be deleted"</code></td>
+      <td>The Argo CD <code>Application</code>'s finalizer is waiting for Argo CD itself,
+          which is being destroyed in the same run.</td>
+      <td><code>kubectl patch application/{prodx,external-secrets} -p '{"metadata":{"finalizers":[]}}'</code>
+          then re-run destroy.</td>
+    </tr>
+    <tr>
+      <td><code>Cloudflare error 1022: "tunnel has active connections"</code></td>
+      <td>cloudflared pods stop reconnecting once their namespace is torn down, but
+          Cloudflare's edge takes ~2-3 min to notice and release the tunnel slot.</td>
+      <td><code>sleep 180</code>, re-run destroy.</td>
+    </tr>
+    <tr>
+      <td><code>"Failed to construct REST client"</code> on a <code>kubernetes_manifest</code></td>
+      <td>The cluster is already gone but the manifest is still in TF state. TF can't
+          delete-by-API because there's no API to talk to.</td>
+      <td><code>terraform state rm 'kubernetes_manifest.*'</code> the orphans, then
+          targeted destroy of the remaining <code>module.cloudflare.*</code> resources.</td>
+    </tr>
+  </table>
+
+  <p><b>The 30-day project-id lock</b> is the only irreversible part. <code>terraform destroy</code>
+  on <code>envs/bootstrap</code> puts the GCP project into <code>DELETE_REQUESTED</code> —
+  the id stays reserved for 30 days. <b>To rebuild before then, pick a fresh id</b> and update
+  it in three places: <code>envs/bootstrap/terraform.tfvars</code>,
+  <code>envs/dev/terraform.tfvars</code>, and
+  <code>envs/vault-bootstrap/terraform.tfvars</code>. The
+  <a href="architecture-canvas.html">architecture canvas walkthrough</a> step 15 also covers this.</p>
+
+  <p><b>Two related soft-locks that DO recover automatically:</b></p>
+  <ul class="clean">
+    <li><b>WIF pool id</b> — soft-deleted for 30 days. The <code>registry</code> module appends
+        a fresh random hex suffix to every pool id (<code>github-pool-&lt;hex&gt;</code>), so a
+        re-apply creates a brand-new pool. Old ones expire silently.</li>
+    <li><b>CI deploy gates</b> — the <code>publish</code> + <code>deploy</code> jobs in
+        <code>ci-backend.yml</code> / <code>ci-frontend.yml</code> are gated on
+        <code>vars.GCP_PROJECT_ID != ''</code>. While the env is destroyed those Actions
+        variables are absent, so CI on <code>main</code> stays green (build + scan only).
+        After the next apply the variables come back and publish/deploy resume.</li>
+  </ul>
+
+  <p>For the actual command-by-command teardown and rebuild, see the
+  <a href="index.html#destroy">setup guide's destroy section</a> or click through chips
+  <b>12 → 16</b> in the <a href="architecture-canvas.html">architecture canvas walkthrough</a>.</p>
+</div>
 
 <!-- ============================================================= -->
 <h2 id="cheat">24 · TL;DR cheat sheet</h2>
