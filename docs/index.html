@@ -136,6 +136,7 @@
   <div class="grp">Get ready</div>
   <a href="#what">1 · What is ProdX?</a>
   <a href="#accounts">2 · Accounts you need</a>
+  <a href="#modes">2.1 · With or without Vault</a>
   <a href="#tools">3 · Install the tools</a>
   <a href="#fork">4 · Fork the 3 repos</a>
   <a href="#login">5 · Log in to everything</a>
@@ -223,12 +224,52 @@ The whole thing is split into <b>three GitHub repositories</b>, each with one jo
     <td><a href="https://app.terraform.io">app.terraform.io</a></td>
   </tr>
   <tr>
-    <td><b>HashiCorp Vault</b></td>
+    <td><b>HashiCorp Vault</b><br><span style="color:var(--faint)">optional</span></td>
     <td>A secure vault that holds passwords the app needs. This project uses a Vault server
-        already running at <code>https://vault.pbcv.dev</code>.</td>
-    <td>Use an existing Vault server (you need a login for it).</td>
+        already running at <code>https://vault.pbcv.dev</code>.
+        <br><b>Optional:</b> you can also run the project <i>without</i> Vault — you'll paste
+        the passwords directly into a Terraform config file instead. See the
+        <a href="#modes">two-mode section</a> below.</td>
+    <td>Use an existing Vault server (you need a login for it), or skip entirely.</td>
   </tr>
 </table>
+
+<!-- ============================================================= -->
+<h2 id="modes">2.1 · Two ways to run this project — with or without Vault</h2>
+
+<p>Real-world ProdX keeps every password (database, Cloudflare API token, GitHub PAT…) in a
+<b>HashiCorp Vault</b> server and lets the cluster fetch them at runtime through the
+<b>External Secrets Operator (ESO)</b>. That's the production path and the default.</p>
+
+<p>If you don't have a Vault server (e.g. you're a tutor reviewing the project), you can flip
+a single toggle and the project runs in <b>tfvars-only</b> mode: passwords live in the local
+<code>terraform.tfvars</code> file (which is git-ignored, never committed) and the Helm chart
+renders a plain Kubernetes <code>Secret</code> instead of an <code>ExternalSecret</code>.</p>
+
+<table>
+  <tr><th></th><th>Mode A — with Vault (default, production-style)</th><th>Mode B — without Vault (tutor / quick demo)</th></tr>
+  <tr><td><b>Vault server</b></td><td>Required (this project uses <code>vault.pbcv.dev</code>).</td><td>Not used.</td></tr>
+  <tr><td><b>Where the DB password lives at rest</b></td><td>In Vault at <code>secret/prodx/postgres</code> — encrypted, audited, rotatable from the UI.</td><td>In your <code>terraform.tfvars</code> (git-ignored) and inside the Argo CD Application object in the cluster.</td></tr>
+  <tr><td><b>How the cluster reads it</b></td><td>External Secrets Operator authenticates to Vault with a K8s ServiceAccount JWT, reads the secret, and materializes a <code>postgres-credentials</code> Secret in the <code>prodx</code> namespace.</td><td>The Helm chart renders a plain <code>postgres-credentials</code> Secret directly from the values you set in tfvars.</td></tr>
+  <tr><td><b>Extra steps</b></td><td>Run Step <a href="#build">8.4 (<code>vault-bootstrap</code>)</a> to wire the cluster ↔ Vault trust and seed initial values.</td><td><b>Skip</b> Step 8.4 entirely. Set <code>use_vault = false</code> in <code>envs/dev/terraform.tfvars</code> and add a <code>postgres_password</code>.</td></tr>
+  <tr><td><b>Rotating secrets later</b></td><td><code>vault kv put secret/prodx/postgres password=NEW</code> — picked up within the hour, no redeploy.</td><td>Edit <code>terraform.tfvars</code>, re-run <code>terraform apply</code>.</td></tr>
+  <tr><td><b>Which steps in this guide apply</b></td><td>All of them, in order.</td><td>Skip Step 5 (<code>vault login</code>) and Step 8.4. Step 6 also doesn't need the <code>vault</code> CLI.</td></tr>
+</table>
+
+<div class="note tip">
+  <span class="lbl">Both modes use the same code</span>
+  Switching between modes is a single setting (<code>use_vault</code>) in
+  <code>envs/dev/terraform.tfvars</code>. Nothing about the cluster, the app images, or the
+  Helm chart needs editing — the chart adapts to whichever mode is selected.
+</div>
+
+<div class="note warn">
+  <span class="lbl">Mode B is for review / demo, not production</span>
+  In Mode B the database password ends up in two places: your local <code>terraform.tfvars</code>
+  file (git-ignored, on your laptop) and the Argo CD <code>Application</code> object in the
+  cluster (visible to anyone with cluster admin). It's the right trade-off when you're
+  evaluating the project; for a real deployment use Mode A.
+</div>
 
 <div class="note warn">
   <span class="lbl">Google Cloud — the $300 free trial</span>
@@ -344,7 +385,8 @@ gcloud auth application-default login</pre>
 <p>Type <code>yes</code>, approve in the browser. This saves a token so Terraform can store
 its state safely online.</p>
 
-<h3>HashiCorp Vault</h3>
+<h3>HashiCorp Vault <span class="pill" style="background:#fef3c7;color:#92400e;">Mode A only</span></h3>
+<p><b>Skip this section if you're running in Mode B</b> (no Vault). For Mode A:</p>
 <div class="code">
 <button class="copy">Copy</button>
 <pre>export VAULT_ADDR=https://vault.pbcv.dev
@@ -385,7 +427,10 @@ you'll paste them into config files in Step 8.</p>
   <tr><td><b>GitHub access token (PAT)</b></td>
       <td>See the step-by-step below.</td></tr>
   <tr><td><b>Database password</b></td>
-      <td>You <i>invent</i> this — pick a strong password for the app's database.</td></tr>
+      <td>You <i>invent</i> this — pick a strong password for the app's database.
+          In <b>Mode A</b> you'll paste it into <code>envs/vault-bootstrap/terraform.tfvars</code>
+          (Step 8.4). In <b>Mode B</b> you'll paste it into <code>envs/dev/terraform.tfvars</code>
+          as <code>postgres_password</code> (Step 8.3).</td></tr>
 </table>
 
 <h3>How to create the Cloudflare API token</h3>
@@ -460,7 +505,7 @@ a folder you go into and run a couple of commands. <b>Run them in this exact ord
   <tr><td>1</td><td><code>envs/tfc-bootstrap</code></td><td>The online "save slots" for Terraform's state</td><td>~10 s</td></tr>
   <tr><td>2</td><td><code>envs/bootstrap</code></td><td>The Google Cloud project</td><td>~3 min</td></tr>
   <tr><td>3</td><td><code>envs/dev</code></td><td>The cluster + Argo CD + registry (the big one)</td><td>~22 min</td></tr>
-  <tr><td>4</td><td><code>envs/vault-bootstrap</code></td><td>Connects the cluster to Vault, stores the passwords</td><td>~1 min</td></tr>
+  <tr><td>4</td><td><code>envs/vault-bootstrap</code> <span style="color:var(--faint);">(Mode A only)</span></td><td>Connects the cluster to Vault, stores the passwords. <b>Skip in Mode B.</b></td><td>~1 min</td></tr>
   <tr><td>5</td><td><code>envs/github-bootstrap</code></td><td>Locks down the GitHub repos (branch protection)</td><td>~10 s</td></tr>
 </table>
 
@@ -522,6 +567,21 @@ cloudflare_domain     = "YOUR-DOMAIN"            <span class="c"># e.g. example.
 github_repo_owner     = "YOUR-GITHUB-USERNAME"
 github_token          = "YOUR-GITHUB-PAT"        <span class="c"># the token from step 6</span></pre>
 </div>
+
+<div class="note info">
+  <span class="lbl">Mode B (no Vault) — add four extra lines</span>
+  If you're running <b>without a Vault server</b>, also add these to
+  <code>terraform.tfvars</code>. They tell Terraform to skip External Secrets Operator and
+  instead render the database password directly into the cluster as a plain K8s Secret:
+  <div class="code" style="margin-top:.5rem;">
+  <button class="copy">Copy</button>
+  <pre>use_vault         = false
+postgres_username = "prodx"
+postgres_password = "YOUR-DB-PASSWORD"      <span class="c"># pick a strong one</span>
+postgres_database = "prodx"</pre>
+  </div>
+  In Mode A leave all four out — their defaults are correct and the real values live in Vault.
+</div>
 <p>Then build it. The <b>first</b> build runs in three stages (the cluster has to exist before
 the tools that talk to it can be set up):</p>
 <div class="code">
@@ -543,8 +603,11 @@ terraform apply -auto-approve</pre>
   Normal updates later are just a single <code>terraform apply</code>.
 </div>
 
-<h3>8.4 — vault-bootstrap (passwords for the app)</h3>
-<p>This connects the cluster to Vault and stores the app's passwords there.
+<h3>8.4 — vault-bootstrap (passwords for the app) <span class="pill" style="background:#fef3c7;color:#92400e;">Mode A only</span></h3>
+<p><b>Skip this entire step in Mode B.</b> In Mode B the database password was already
+provided in <code>envs/dev/terraform.tfvars</code> (Step 8.3), and the chart created the
+<code>postgres-credentials</code> Secret automatically — no Vault wiring needed.</p>
+<p>For <b>Mode A</b>: this connects the cluster to Vault and stores the app's passwords there.
 Make sure you ran <code>vault login</code> (Step 5) first.</p>
 <div class="code">
 <button class="copy">Copy</button>
@@ -673,7 +736,7 @@ kubectl -n argocd get application prodx</pre>
   </div>
 </div>
 
-<h3>Reading a password out of Vault</h3>
+<h3>Reading a password out of Vault <span class="pill" style="background:#fef3c7;color:#92400e;">Mode A only</span></h3>
 <p>The app's database password lives in Vault. The cluster fetches it automatically, but you
 can look it up yourself any time:</p>
 <div class="code">
@@ -682,6 +745,10 @@ can look it up yourself any time:</p>
 </div>
 <p>To change it later: <code>vault kv put secret/prodx/postgres password=NEW-VALUE</code> —
 the cluster picks up the change within an hour.</p>
+<p><b>In Mode B</b>, you don't have a Vault — the password lives in
+<code>envs/dev/terraform.tfvars</code> as <code>postgres_password</code>. To rotate it, edit
+that file and re-run <code>terraform apply</code> in <code>envs/dev</code>; the Argo
+Application gets the new value and the chart's plain Secret updates on Argo's next sync.</p>
 
 <!-- ============================================================= -->
 <h2 id="pause">11 · Pause &amp; resume (save money)</h2>
@@ -727,7 +794,8 @@ the build order: <code>vault-bootstrap</code> goes first because its
 
 <div class="code">
 <button class="copy">Copy</button>
-<pre><span class="c"># 1. The Vault wiring + secrets (needs the cluster still up)</span>
+<pre><span class="c"># 1. The Vault wiring + secrets (Mode A only — skip in Mode B)</span>
+<span class="c">#    Needs the cluster still up.</span>
 cd ProdXTF/envs/vault-bootstrap
 terraform destroy
 
