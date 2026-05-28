@@ -49,6 +49,7 @@ This README is the **entry point**. Everything else is reachable from here:
 - App: <https://prodx.pbcv.dev>
 - API: <https://prodxapi.pbcv.dev/api/metrics>
 - Argo CD: <https://argocd.pbcv.dev>
+- Grafana: <https://grafana.pbcv.dev> (admin / `kubectl -n monitoring get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' \| base64 -d`)
 
 ---
 

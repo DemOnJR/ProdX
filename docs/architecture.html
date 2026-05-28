@@ -155,6 +155,7 @@
   <a href="#cloudflare">14 · Cloudflare Tunnel</a>
   <a href="#vault">15 · HashiCorp Vault</a>
   <a href="#eso">16 · External Secrets Operator</a>
+  <a href="#monitoring">16.5 · Prometheus + Grafana</a>
   <a href="#trivy">17 · Trivy</a>
   <div class="grp">How it all flows</div>
   <a href="#cipipe">18 · The CI pipeline</a>
@@ -569,6 +570,24 @@ GCP STS      ─(4) impersonates SA──────────▶ gha-prodx-p
   the chart's <code>ClusterSecretStore</code> / <code>ExternalSecret</code> templates are wrapped
   in <code>{{- if .Values.secrets.useVault -}}</code> so nothing referencing the missing CRDs
   ever renders.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="monitoring">16.5 · kube-prometheus-stack (Prometheus + Grafana + node-exporter)</h2>
+
+<div class="card">
+  <div class="meta"><span class="pill cat-cluster">Cluster</span></div>
+  <p><b>What:</b> The community <code>kube-prometheus-stack</code> Helm chart, installed in the <code>monitoring</code> namespace by a 3rd Argo CD Application (after the prodx workloads + ESO). Bundles four pieces:</p>
+  <ul class="clean">
+    <li><b>Prometheus</b> — TSDB + scraper. 5Gi PVC, 10-day retention. Scrapes node-exporter every 30s, plus the K8s API server, kube-state-metrics, and any pod with a matching <code>ServiceMonitor</code> CR.</li>
+    <li><b>Grafana</b> — UI on port 80, reached via the Cloudflare Tunnel at <code>grafana.&lt;domain&gt;</code>. Auto-loads ~30 prebuilt dashboards as ConfigMaps with the <code>grafana_dashboard=1</code> label (Node Exporter, Kubernetes compute, Namespace, Workload, Networking).</li>
+    <li><b>node-exporter</b> — DaemonSet, one pod per K8s node. Exposes host-level Linux metrics on <code>:9100/metrics</code> (CPU per mode, memory, disk I/O, network, load average).</li>
+    <li><b>kube-state-metrics</b> — Deployment that converts K8s API objects (Pods, Deployments, HPAs…) into Prometheus metrics.</li>
+  </ul>
+  <p><b>Sync ordering:</b> the chart's Argo Application carries <code>argocd.argoproj.io/sync-wave: "2"</code> so Argo CD installs it AFTER the prodx workloads (wave 0) and External Secrets Operator (wave 1). Argo waits for each wave to report Healthy before moving on — the "monitoring goes last" property is declarative, not a Terraform <code>depends_on</code>.</p>
+  <p><b>Login:</b> the admin user is <code>admin</code>. Initial password is read from <code>secret/prodx/grafana/admin_password</code> in Vault (Mode A) or <code>var.grafana_admin_password</code> in tfvars (Mode B); if both are empty, the chart auto-generates one — retrieve with <code>kubectl -n monitoring get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d</code>. Rotate inside Grafana on first login.</p>
+  <p><b>Cost on the dev cluster:</b> ~1 GB RAM + ~200m CPU total across all pieces. Fits comfortably on the existing <code>e2-medium</code> node pool — no additional GCP spend.</p>
+  <p><b>Alertmanager disabled by default</b> (no Slack/PagerDuty webhook wired yet). Flip <code>alertmanager.enabled=true</code> in the Argo Application's Helm parameters once you have a notification destination.</p>
 </div>
 
 <!-- ============================================================= -->

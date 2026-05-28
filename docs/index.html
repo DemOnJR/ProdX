@@ -753,7 +753,15 @@ kubectl -n argocd get application prodx</pre>
   <li><code>https://prodx.YOUR-DOMAIN</code> — the website</li>
   <li><code>https://prodxapi.YOUR-DOMAIN/api/metrics</code> — the API (returns some JSON)</li>
   <li><code>https://argocd.YOUR-DOMAIN</code> — the Argo CD dashboard</li>
+  <li><code>https://grafana.YOUR-DOMAIN</code> — Grafana dashboards (Prometheus + node metrics)</li>
 </ul>
+<p>The Grafana login is <code>admin</code>. Grab the initial password the same way you grabbed the Argo CD one — the chart auto-generated it on install:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre>kubectl -n monitoring get secret kube-prometheus-stack-grafana \
+  -o jsonpath='{.data.admin-password}' | base64 -d ; echo</pre>
+</div>
+<p>Rotate the password inside Grafana (top-right user icon → Change Password) after first login. Then expand the left menu → <b>Dashboards</b> → <b>Browse</b>: ~30 dashboards are pre-loaded (Node Exporter, Kubernetes compute, Namespace, Workload, Networking).</p>
 
 <p>Or check from the terminal — Cloudflare DNS can take 30-90s after the first apply,
 so wait for IPv4 records before testing:</p>
@@ -764,7 +772,7 @@ until dig +short A prodx.YOUR-DOMAIN @1.1.1.1 | grep -q "^[0-9]"; do sleep 10; d
 
 <span class="c"># WSL/IPv6-blocked? -4 forces IPv4. Expect: prodx 200, prodxapi 404 (no /</span>
 <span class="c"># route — try /api/metrics for the JSON), argocd 200.</span>
-for h in prodx prodxapi argocd; do
+for h in prodx prodxapi argocd grafana; do
   curl -4 -s -o /dev/null -w "$h: %{http_code}\n" https://$h.YOUR-DOMAIN
 done
 
