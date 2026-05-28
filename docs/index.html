@@ -816,6 +816,23 @@ done
 curl -4 -s https://prodxapi.YOUR-DOMAIN/api/metrics</pre>
 </div>
 
+<p>Or check from the terminal — Cloudflare DNS can take 30-90s after the first apply,
+so wait for IPv4 records before testing:</p>
+<div class="code">
+<button class="copy">Copy</button>
+<pre><span class="c"># Wait for A records to publish (skip if dig already returns IPv4)</span>
+until dig +short A prodx.YOUR-DOMAIN @1.1.1.1 | grep -q "^[0-9]"; do sleep 10; done
+
+<span class="c"># WSL/IPv6-blocked? -4 forces IPv4. Expect: prodx 200, prodxapi 404 (no /</span>
+<span class="c"># route — try /api/metrics for the JSON), argocd 200.</span>
+for h in prodx prodxapi argocd; do
+  curl -4 -s -o /dev/null -w "$h: %{http_code}\n" https://$h.YOUR-DOMAIN
+done
+
+<span class="c"># Fetch the API health payload</span>
+curl -4 -s https://prodxapi.YOUR-DOMAIN/api/metrics</pre>
+</div>
+
 <div class="note tip">
   <span class="lbl">Give it a minute</span>
   Right after the first build the app pages may show an error for a minute or two while the
