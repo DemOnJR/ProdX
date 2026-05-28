@@ -942,6 +942,8 @@ gcloud auth application-default set-quota-project $(terraform output -raw projec
 #   project_id (same as Step 3)
 #   cloudflare_api_token, cloudflare_account_id, cloudflare_zone_id, cloudflare_domain
 #   github_repo_owner, github_token
+#   grafana_admin_password  ← set NOW; the env var only initializes the
+#                             Grafana DB on first start, see Step 10 note
 #   (Mode B: + use_vault=false, postgres_password)
 
 terraform init
@@ -1255,6 +1257,7 @@ terraform destroy -auto-approve
 #    remaining Cloudflare resources directly:
 terraform state rm 'kubernetes_manifest.prodx_root_app' || true
 terraform state rm 'kubernetes_manifest.external_secrets_app[0]' || true
+terraform state rm 'kubernetes_manifest.monitoring_app' || true
 terraform destroy \\
   -target=module.cloudflare.cloudflare_zero_trust_tunnel_cloudflared.this \\
   -target=module.cloudflare.random_id.tunnel_secret \\
