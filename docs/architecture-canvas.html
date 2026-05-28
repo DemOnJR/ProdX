@@ -1095,7 +1095,7 @@ gcloud artifacts docker images list \\
     num: 10,
     title: 'Argo CD reconciles the workloads',
     where: '(automatic — three sync waves over ~5 min)',
-    notes: 'Argo CD applies the three Application CRs in order of <code>argocd.argoproj.io/sync-wave</code>. Wave 0: <b>prodx</b> — postgres, redis, prodx-api, prodx-web, HPAs, Services. Wave 1: <b>external-secrets</b> (Mode A only) — ESO controller, then it materializes postgres-credentials. Wave 2: <b>monitoring</b> — kube-prometheus-stack (Prometheus, Grafana with ~30 dashboards, node-exporter DaemonSet, kube-state-metrics). Monitoring goes last so the workloads it scrapes exist before Prometheus comes up.',
+    notes: 'Argo CD applies the three Application CRs in order of <code>argocd.argoproj.io/sync-wave</code>. Wave 0: <b>prodx</b> — postgres, redis, prodx-api, prodx-web, HPAs, Services. Wave 1: <b>external-secrets</b> (Mode A only) — ESO controller, then it materializes postgres-credentials. Wave 2: <b>monitoring</b> — kube-prometheus-stack (Prometheus, Grafana with ~30 dashboards, node-exporter DaemonSet, kube-state-metrics). Monitoring goes last so the workloads it scrapes exist before Prometheus comes up.<br><br><b>Grafana login gotcha:</b> <code>GF_SECURITY_ADMIN_PASSWORD</code> only initializes the admin user on the FIRST start with an empty DB. If you applied with an empty <code>grafana_admin_password</code> and <code>read_secrets_from_vault=false</code> the chart auto-generated a random password into the K8s Secret, but Grafana wrote a DIFFERENT password to its own SQLite DB. Resolve by running <code>grafana-cli admin reset-admin-password</code> inside the pod (commands below).',
     commands:
 `# Watch it converge
 $(terraform output -raw get_credentials_command)
@@ -1104,10 +1104,29 @@ kubectl -n prodx get pods                             # wave 0 workloads
 kubectl -n external-secrets get pods                  # wave 1 (Mode A only)
 kubectl -n monitoring get pods                        # wave 2: grafana · prometheus · node-exporter × N
 
-# Get Grafana login (chart auto-generates the admin password if you didn't
-# inject one via Helm parameters):
-kubectl -n monitoring get secret kube-prometheus-stack-grafana \\
-  -o jsonpath='{.data.admin-password}' | base64 -d ; echo`,
+# Get Grafana login. The K8s Secret has the chart-managed value but
+# Grafana's own DB (on the PVC) may not match if the first install
+# happened with an empty Helm parameter. Safest path:
+NEW_PASS='pick-a-strong-one'
+POD=$(kubectl -n monitoring get pod -l app.kubernetes.io/name=grafana \\
+  --no-headers | awk '{print $1}' | head -1)
+
+# Reset Grafana's DB-stored admin password authoritatively:
+kubectl -n monitoring exec -c grafana "$POD" -- \\
+  grafana-cli admin reset-admin-password "$NEW_PASS"
+
+# Also update the K8s Secret so kubectl reads return the right value:
+kubectl -n monitoring patch secret kube-prometheus-stack-grafana \\
+  --type='json' \\
+  -p="[{\\"op\\":\\"replace\\",\\"path\\":\\"/data/admin-password\\",\\"value\\":\\"$(echo -n "$NEW_PASS" | base64 -w0)\\"}]"
+
+# Confirm:
+curl -4 -s -o /dev/null -w "auth: %{http_code}\\n" \\
+  -u "admin:$NEW_PASS" https://grafana.<your-domain>/api/user
+
+# Long-term: set var.grafana_admin_password in envs/dev/terraform.tfvars
+# (or read_secrets_from_vault=true + secret/prodx/grafana in Vault), then
+# on the NEXT clean install the env var is authoritative from day one.`,
     creates: {
       nodes: [
         'dep-web', 'dep-api', 'svc-web', 'svc-api',

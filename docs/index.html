@@ -755,13 +755,49 @@ kubectl -n argocd get application prodx</pre>
   <li><code>https://argocd.YOUR-DOMAIN</code> — the Argo CD dashboard</li>
   <li><code>https://grafana.YOUR-DOMAIN</code> — Grafana dashboards (Prometheus + node metrics)</li>
 </ul>
-<p>The Grafana login is <code>admin</code>. Grab the initial password the same way you grabbed the Argo CD one — the chart auto-generated it on install:</p>
-<div class="code">
-<button class="copy">Copy</button>
-<pre>kubectl -n monitoring get secret kube-prometheus-stack-grafana \
-  -o jsonpath='{.data.admin-password}' | base64 -d ; echo</pre>
+<p>The Grafana login is <code>admin</code>. The password story has a gotcha worth knowing about — see the warning below.</p>
+
+<div class="note warn">
+  <span class="lbl">Grafana password gotcha — read this if login fails</span>
+  Grafana's <code>GF_SECURITY_ADMIN_PASSWORD</code> env var only initializes the admin user
+  on the <b>first</b> start with an empty database. After that, the password lives in
+  Grafana's own SQLite DB on the PVC — env-var changes do nothing.
+  <br><br>
+  If your <code>terraform apply</code> ran with an empty <code>grafana_admin_password</code>
+  (the default), the chart generated a random password and wrote it to a K8s Secret —
+  but Grafana saved a <i>different</i> value to its DB. Login fails because the three
+  copies (Vault, K8s Secret, Grafana DB) don't agree.
+  <br><br>
+  <b>One-shot fix</b> — reset the DB-stored password to a value you choose and sync the
+  K8s Secret:
+  <div class="code" style="margin-top:.5rem;">
+  <button class="copy">Copy</button>
+  <pre>NEW_PASS='pick-a-strong-one'
+POD=$(kubectl -n monitoring get pod -l app.kubernetes.io/name=grafana \
+  --no-headers | awk '{print $1}' | head -1)
+
+# Reset Grafana's DB-stored password (the source of truth at runtime):
+kubectl -n monitoring exec -c grafana "$POD" -- \
+  grafana-cli admin reset-admin-password "$NEW_PASS"
+
+# Sync the K8s Secret so kubectl returns the right value:
+kubectl -n monitoring patch secret kube-prometheus-stack-grafana \
+  --type='json' \
+  -p="[{\"op\":\"replace\",\"path\":\"/data/admin-password\",\"value\":\"$(echo -n "$NEW_PASS" | base64 -w0)\"}]"
+
+# Verify:
+curl -4 -s -o /dev/null -w "auth: %{http_code}\n" \
+  -u "admin:$NEW_PASS" https://grafana.YOUR-DOMAIN/api/user
+# Expect: auth: 200</pre>
+  </div>
+  <b>Permanent fix</b> for the next install: set <code>grafana_admin_password</code> in
+  <code>envs/dev/terraform.tfvars</code> (or <code>read_secrets_from_vault=true</code> with
+  <code>secret/prodx/grafana/admin_password</code> in Vault) <b>before</b> the first apply.
+  Grafana then initializes its DB with your value on day one and the three sources stay
+  in sync.
 </div>
-<p>Rotate the password inside Grafana (top-right user icon → Change Password) after first login. Then expand the left menu → <b>Dashboards</b> → <b>Browse</b>: ~30 dashboards are pre-loaded (Node Exporter, Kubernetes compute, Namespace, Workload, Networking).</p>
+
+<p>Once logged in, expand the left menu → <b>Dashboards</b> → <b>Browse</b>: ~30 dashboards are pre-loaded (Node Exporter, Kubernetes compute, Namespace, Workload, Networking).</p>
 
 <p>Or check from the terminal — Cloudflare DNS can take 30-90s after the first apply,
 so wait for IPv4 records before testing:</p>
