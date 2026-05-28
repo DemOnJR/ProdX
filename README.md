@@ -25,11 +25,22 @@ This is the **app repo**. There are two more, each with its own README:
 
 | Repo | What it holds | When you touch it |
 |---|---|---|
-| **ProdX** (here) | App source code, Dockerfiles, GitHub Actions CI, local docker-compose | Day-to-day development |
+| **ProdX** (here) | App source code, Dockerfiles, GitHub Actions CI, local docker-compose, the full setup docs | Day-to-day development |
 | [**ProdXTF**](https://github.com/DemOnJR/ProdXTF) | Terraform for GCP project + GKE + Argo CD + Cloudflare tunnel | Once, to build the infrastructure |
 | [**ProdXCD**](https://github.com/DemOnJR/ProdXCD) | Helm chart (what runs in the cluster) | When you tune replicas, resources, or env vars |
 
-> **First time here?** Start with [the prerequisites and account setup](#first-time-setup-accounts-you-will-need), then go to [ProdXTF's README](https://github.com/DemOnJR/ProdXTF) to build the cluster. After that come back here.
+## 📍 The tutorial path — read these in order
+
+This README is the **entry point**. Everything else is reachable from here:
+
+1. **You are here.** Skim this README for the big picture + local dev with `docker compose`.
+2. [`docs/index.html`](docs/index.html) — the **14-section beginner setup guide** (account signup → tools → tfvars → first deploy → verification → troubleshooting). Open it in a browser. Self-contained, no CDN.
+3. [`docs/architecture-canvas.html`](docs/architecture-canvas.html) — the **interactive canvas walkthrough**. 16 numbered chips (11 build steps + 5 teardown). Click a chip → see the exact commands + which components light up at that step.
+4. [`docs/architecture.html`](docs/architecture.html) — **component reference** (one card per tool: what / why / how it connects). Use as a lookup once you've followed steps 1–3.
+5. → [ProdXTF README](https://github.com/DemOnJR/ProdXTF) — the **infrastructure tutorial** (5 envs, run in order). Comes back here when CI is wired up.
+6. → [ProdXCD README](https://github.com/DemOnJR/ProdXCD) — the **chart tutorial** (what runs inside the cluster + how to ship a change).
+
+> **Two modes — with or without Vault.** Production-style installs use a HashiCorp Vault server for runtime secrets via External Secrets Operator (Mode A). If you don't have a Vault, set `use_vault = false` in `envs/dev/terraform.tfvars` and the chart renders a plain K8s Secret from values you pass in (Mode B). Same setup commands, same cluster shape — see the [two-mode section in the setup guide](docs/index.html#modes).
 
 ---
 
@@ -265,4 +276,16 @@ ProdX/
 
 ## Want the long version?
 
-A full, beginner-friendly setup guide is at [`docs/index.html`](docs/index.html) — open it in a browser. Fourteen sections covering account setup, installing the tools, the Terraform build, verification, Argo CD, pausing/destroying, and troubleshooting.
+Three docs in `docs/`, in increasing detail:
+
+| File | When to use it |
+|---|---|
+| [`docs/index.html`](docs/index.html) | **Step-by-step setup guide.** 14 sections, beginner-friendly. Open in a browser; copy-paste each code block. |
+| [`docs/architecture-canvas.html`](docs/architecture-canvas.html) | **Interactive walkthrough.** Click chips 1→11 to watch the project build; 12→16 to watch it tear down. Each chip shows the exact commands + which components are created/removed. Three filter buttons (🔐 secrets path, 🐙 Argo CD path, ☸ in-cluster) isolate sub-graphs. |
+| [`docs/architecture.html`](docs/architecture.html) | **Component reference.** One card per tool — what it is, why it's here, how it connects. Look here when you want to understand a specific piece. |
+
+---
+
+## ➡️ Next step
+
+Once you've finished the account setup section above (or [the prerequisites in `docs/index.html`](docs/index.html)), go to **[ProdXTF's README](https://github.com/DemOnJR/ProdXTF)** to build the cluster. After that, come back here to push your first commit (Section 8.6 of the setup guide). Then [ProdXCD](https://github.com/DemOnJR/ProdXCD) when you want to tune what runs inside the cluster.
